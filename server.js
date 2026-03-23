@@ -1,126 +1,80 @@
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
-// --- Persistence ---
-function loadData() {
+// --- Appliquer un template à une semaine (MongoDB) ---
+app.post('/api/templates/:id/apply', async (req, res) => {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-      return JSON.parse(raw);
+    const tpl = await templatesCol.findOne({ id: req.params.id });
+    if (!tpl) return res.status(404).json({ error: 'Template introuvable' });
+    const { weekStart } = req.body; // "2026-03-23" (lundi)
+    if (!weekStart) return res.status(400).json({ error: 'weekStart requis' });
+    const created = [];
+    for (const tplSession of tpl.sessions) {
+      const d = new Date(weekStart);
+      d.setDate(d.getDate() + (tplSession.dayOfWeek - 1));
+      const dateStr = d.toISOString().slice(0, 10);
+      const session = {
+        id: crypto.randomUUID(),
+        date: dateStr,
+        name: tplSession.name,
+        blocks: tplSession.blocks.map(b => ({
+          type: b.type,
+          exercises: b.exercises.map(ex => ({
+            name: ex.name,
+            rest: ex.rest || 0,
+            sets: Array.from({ length: ex.setsCount }, () => ({ reps: 0, weight: 0 }))
+          }))
+        }))
+      };
+      await sessionsCol.insertOne(session);
+      created.push(session);
     }
+    res.status(201).json({ message: `${created.length} séances créées`, sessions: created });
   } catch (e) {
-    console.error('Erreur lecture data.json:', e.message);
-  }
-  return { tasks: [], sessions: [], templates: [] };
-}
-
-function saveData(d) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2), 'utf-8');
-}
-
-let data = loadData();
-// Migration
-if (Array.isArray(data)) {
-  data = { tasks: data, sessions: [], templates: [] };
-  saveData(data);
-}
-if (!data.templates) { data.templates = []; saveData(data); }
-
-// Migration: sessions avec exercises -> blocks
-data.sessions.forEach(s => {
-  if (s.exercises && !s.blocks) {
-    s.blocks = s.exercises.map(ex => ({ type: 'single', exercises: [ex] }));
-    delete s.exercises;
+    res.status(500).json({ error: 'Erreur MongoDB' });
   }
 });
-saveData(data);
 
-// Helper: sanitize block
-function sanitizeBlocks(blocks) {
-  return (blocks || []).map(b => ({
-    type: b.type === 'superset' ? 'superset' : 'single',
-    exercises: (b.exercises || []).map(ex => ({
-      name: (ex.name || '').trim().slice(0, 200),
-      rest: Math.max(0, Math.min(3600, parseInt(ex.rest) || 0)),
-      sets: (ex.sets || []).map(s => ({
-        reps: Math.max(0, Math.min(9999, parseInt(s.reps) || 0)),
-        weight: Math.max(0, Math.min(9999, parseFloat(s.weight) || 0))
-      }))
-    }))
-  }));
-}
-
-// Helper: flatten blocks to exercises (for top perfs)
+// --- Utilitaire pour extraire tous les exercices d'une séance (pour top-perfs) ---
 function flattenExercises(session) {
-  if (session.blocks) {
-    return session.blocks.flatMap(b => b.exercises || []);
-  }
-  return session.exercises || [];
+  const all = [];
+  if (!session.blocks) return all;
+  session.blocks.forEach(block => {
+    (block.exercises || []).forEach(ex => {
+      all.push(ex);
+    });
+  });
+  return all;
 }
 
-// --- TASKS API ---
-app.get('/api/tasks', (req, res) => res.json(data.tasks));
-
-app.post('/api/tasks', (req, res) => {
-  const { task } = req.body;
-  if (!task || typeof task !== 'string' || task.trim().length === 0)
-    return res.status(400).json({ error: 'Tâche invalide' });
-  const sanitized = task.trim().slice(0, 500);
-  data.tasks.push(sanitized);
-  saveData(data);
-  res.status(201).json({ message: `"${sanitized}" ajoutée !`, tasks: data.tasks });
+// --- TOP PERFS API (MongoDB) ---
+app.get('/api/top-perfs', async (req, res) => {
+  try {
+    const sessions = await sessionsCol.find({}).toArray();
+    const perfs = {};
+    sessions.forEach(session => {
+      const exercises = flattenExercises(session);
+      exercises.forEach(ex => {
+        const key = ex.name.toLowerCase();
+        (ex.sets || []).forEach(set => {
+          if (!perfs[key] || set.weight > perfs[key].weight ||
+             (set.weight === perfs[key].weight && set.reps > perfs[key].reps)) {
+            perfs[key] = {
+              exercise: ex.name,
+              weight: set.weight,
+              reps: set.reps,
+              sessionId: session.id,
+              sessionName: session.name,
+              date: session.date
+            };
+          }
+        });
+      });
+    });
+    res.json(Object.values(perfs).sort((a, b) => a.exercise.localeCompare(b.exercise)));
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
 });
-
-app.delete('/api/tasks/:index', (req, res) => {
-  const index = parseInt(req.params.index, 10);
-  if (isNaN(index) || index < 0 || index >= data.tasks.length)
-    return res.status(400).json({ error: 'Numéro invalide' });
-  const removed = data.tasks.splice(index, 1);
-  saveData(data);
-  res.json({ message: `"${removed[0]}" supprimée !`, tasks: data.tasks });
-});
-
-// --- SESSIONS API ---
-app.get('/api/sessions', (req, res) => res.json(data.sessions));
-
-app.get('/api/sessions/:id', (req, res) => {
-  const session = data.sessions.find(s => s.id === req.params.id);
-  if (!session) return res.status(404).json({ error: 'Séance introuvable' });
-  res.json(session);
-});
-
-app.post('/api/sessions', (req, res) => {
-  const { date, name, blocks } = req.body;
-  if (!date || !name || !Array.isArray(blocks))
-    return res.status(400).json({ error: 'Données invalides' });
-  const session = {
-    id: crypto.randomUUID(),
-    date: date.slice(0, 10),
-    name: name.trim().slice(0, 200),
-    blocks: sanitizeBlocks(blocks)
-  };
-  data.sessions.push(session);
-  saveData(data);
-  res.status(201).json(session);
-});
-
-app.put('/api/sessions/:id', (req, res) => {
-  const idx = data.sessions.findIndex(s => s.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Séance introuvable' });
-  const { date, name, blocks } = req.body;
-  if (date) data.sessions[idx].date = date.slice(0, 10);
-  if (name) data.sessions[idx].name = name.trim().slice(0, 200);
-  if (Array.isArray(blocks)) data.sessions[idx].blocks = sanitizeBlocks(blocks);
-  saveData(data);
   res.json(data.sessions[idx]);
 });
 
