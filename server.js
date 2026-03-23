@@ -50,6 +50,7 @@ function sanitizeBlocks(blocks) {
     type: b.type === 'superset' ? 'superset' : 'single',
     exercises: (b.exercises || []).map(ex => ({
       name: (ex.name || '').trim().slice(0, 200),
+      rest: Math.max(0, Math.min(3600, parseInt(ex.rest) || 0)),
       sets: (ex.sets || []).map(s => ({
         reps: Math.max(0, Math.min(9999, parseInt(s.reps) || 0)),
         weight: Math.max(0, Math.min(9999, parseFloat(s.weight) || 0))
@@ -156,7 +157,8 @@ app.post('/api/templates', (req, res) => {
         type: b.type === 'superset' ? 'superset' : 'single',
         exercises: (b.exercises || []).map(ex => ({
           name: (ex.name || '').trim().slice(0, 200),
-          setsCount: Math.max(1, Math.min(20, parseInt(ex.setsCount) || 4))
+          setsCount: Math.max(1, Math.min(20, parseInt(ex.setsCount) || 4)),
+          rest: Math.max(0, Math.min(3600, parseInt(ex.rest) || 0))
         }))
       }))
     }))
@@ -180,7 +182,8 @@ app.put('/api/templates/:id', (req, res) => {
         type: b.type === 'superset' ? 'superset' : 'single',
         exercises: (b.exercises || []).map(ex => ({
           name: (ex.name || '').trim().slice(0, 200),
-          setsCount: Math.max(1, Math.min(20, parseInt(ex.setsCount) || 4))
+          setsCount: Math.max(1, Math.min(20, parseInt(ex.setsCount) || 4)),
+          rest: Math.max(0, Math.min(3600, parseInt(ex.rest) || 0))
         }))
       }))
     }));
@@ -217,6 +220,7 @@ app.post('/api/templates/:id/apply', (req, res) => {
         type: b.type,
         exercises: b.exercises.map(ex => ({
           name: ex.name,
+          rest: ex.rest || 0,
           sets: Array.from({ length: ex.setsCount }, () => ({ reps: 0, weight: 0 }))
         }))
       }))
