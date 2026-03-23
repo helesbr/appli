@@ -1,4 +1,30 @@
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
+const { MongoClient, ObjectId } = require('mongodb');
+const crypto = require('crypto');
 
+const app = express();
+const PORT = process.env.PORT || 3000;
+const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_DBNAME = process.env.MONGODB_DBNAME || 'moggtrack';
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+let db, sessionsCol, templatesCol, tasksCol;
+
+async function connectMongo() {
+  const client = new MongoClient(MONGODB_URI, { useUnifiedTopology: true });
+  await client.connect();
+  db = client.db(MONGODB_DBNAME);
+  sessionsCol = db.collection('sessions');
+  templatesCol = db.collection('templates');
+  tasksCol = db.collection('tasks');
+  console.log('Connecté à MongoDB Atlas');
+}
+
+connectMongo().catch(e => { console.error('Erreur MongoDB:', e); process.exit(1); });
 
 // --- Appliquer un template à une semaine (MongoDB) ---
 app.post('/api/templates/:id/apply', async (req, res) => {
