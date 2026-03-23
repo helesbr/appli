@@ -10,169 +10,537 @@
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #1a1a2e;
       color: #eee;
-      display: flex;
-      justify-content: center;
-      padding: 40px 16px;
       min-height: 100vh;
     }
-    .container {
-      width: 100%;
-      max-width: 500px;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 24px;
-      font-size: 2rem;
-      color: #e94560;
-    }
-    .input-row {
+
+    /* --- NAV --- */
+    .nav {
       display: flex;
-      gap: 8px;
-      margin-bottom: 24px;
-    }
-    input[type="text"] {
-      flex: 1;
-      padding: 12px 16px;
-      border: 2px solid #16213e;
-      border-radius: 8px;
+      justify-content: center;
+      gap: 0;
       background: #16213e;
+      border-bottom: 2px solid #e94560;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav button {
+      flex: 1;
+      max-width: 200px;
+      padding: 14px 0;
+      background: transparent;
+      color: #888;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-bottom: 3px solid transparent;
+    }
+    .nav button.active {
+      color: #e94560;
+      border-bottom-color: #e94560;
+    }
+
+    .page { display: none; padding: 24px 16px; max-width: 700px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    h2 { text-align: center; color: #e94560; margin-bottom: 20px; font-size: 1.5rem; }
+
+    /* --- CALENDAR --- */
+    .week-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
+    .week-nav button { background: #533483; color: #fff; border: none; border-radius: 8px; padding: 10px 16px; cursor: pointer; font-size: 1rem; font-weight: 600; }
+    .week-nav button:hover { background: #e94560; }
+    .week-nav span { font-size: 1rem; color: #ccc; min-width: 220px; text-align: center; }
+
+    .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 24px; }
+    .day-header { text-align: center; font-size: 0.75rem; color: #888; padding: 4px 0; }
+    .day-cell {
+      background: #16213e;
+      border-radius: 8px;
+      min-height: 70px;
+      padding: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+      position: relative;
+    }
+    .day-cell:hover { border-color: #533483; }
+    .day-cell.today { border-color: #e94560; }
+    .day-cell .day-num { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+    .day-cell .session-dot {
+      background: #e94560;
+      color: #fff;
+      font-size: 0.65rem;
+      padding: 2px 5px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 2px;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* --- MODAL --- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 16px;
+      overflow-y: auto;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 550px;
+      animation: fadeIn 0.25s ease;
+    }
+    .modal h3 { color: #e94560; margin-bottom: 16px; }
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 4px; }
+    .form-row input, .form-row select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #1a1a2e;
+      border-radius: 8px;
+      background: #1a1a2e;
       color: #eee;
       font-size: 1rem;
       outline: none;
-      transition: border-color 0.2s;
     }
-    input[type="text"]:focus {
-      border-color: #e94560;
-    }
-    button {
-      padding: 12px 20px;
-      border: none;
+    .form-row input:focus { border-color: #e94560; }
+
+    .exercise-block {
+      background: #1a1a2e;
       border-radius: 8px;
-      cursor: pointer;
-      font-size: 1rem;
-      font-weight: 600;
-      transition: background 0.2s;
+      padding: 12px;
+      margin-bottom: 10px;
     }
-    .btn-add {
-      background: #e94560;
-      color: #fff;
-    }
-    .btn-add:hover { background: #c73e54; }
-    .task-list {
-      list-style: none;
-    }
-    .task-item {
+    .exercise-block .exo-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .exercise-block .exo-header input { flex: 1; margin-right: 8px; }
+    .sets-table { width: 100%; font-size: 0.9rem; }
+    .sets-table th { color: #888; font-weight: 500; text-align: left; padding: 2px 4px; }
+    .sets-table td { padding: 2px 4px; }
+    .sets-table input { width: 70px; padding: 6px 8px; text-align: center; }
+
+    .btn { padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: background 0.2s; }
+    .btn-primary { background: #e94560; color: #fff; }
+    .btn-primary:hover { background: #c73e54; }
+    .btn-secondary { background: #533483; color: #fff; }
+    .btn-secondary:hover { background: #6b44a0; }
+    .btn-danger { background: #c0392b; color: #fff; }
+    .btn-danger:hover { background: #e74c3c; }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+    .btn-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+    /* --- TOP PERF --- */
+    .perf-card {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #16213e;
-      padding: 14px 16px;
-      border-radius: 8px;
-      margin-bottom: 8px;
-      animation: fadeIn 0.3s ease;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      border: 2px solid transparent;
     }
+    .perf-card:hover { border-color: #e94560; }
+    .perf-exo { font-size: 1.1rem; font-weight: 600; }
+    .perf-value { color: #e94560; font-size: 1.2rem; font-weight: 700; }
+    .perf-detail { font-size: 0.8rem; color: #888; margin-top: 4px; }
+
+    /* --- SESSION DETAIL --- */
+    .session-detail-exo { background: #1a1a2e; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    .session-detail-exo h4 { color: #e94560; margin-bottom: 8px; }
+    .session-detail-exo table { width: 100%; font-size: 0.9rem; }
+    .session-detail-exo th { color: #888; text-align: left; padding: 4px 8px; }
+    .session-detail-exo td { padding: 4px 8px; }
+
+    .empty { text-align: center; color: #888; margin-top: 32px; font-size: 1rem; }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-8px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .task-item span {
-      font-size: 1rem;
-      word-break: break-word;
-    }
-    .btn-delete {
-      background: #533483;
-      color: #fff;
-      padding: 8px 14px;
-      font-size: 0.85rem;
-      flex-shrink: 0;
-      margin-left: 12px;
-    }
-    .btn-delete:hover { background: #e94560; }
-    .empty {
-      text-align: center;
-      color: #888;
-      margin-top: 32px;
-      font-size: 1.1rem;
-    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>📝 MoggTrack</h1>
-    <div class="input-row">
-      <input type="text" id="taskInput" placeholder="Nouvelle tâche..." maxlength="500">
-      <button class="btn-add" id="addBtn">Ajouter</button>
+
+  <!-- NAVIGATION -->
+  <div class="nav">
+    <button class="active" data-page="calendar">📅 Calendrier</button>
+    <button data-page="topperf">🏆 Top Perf</button>
+    <button data-page="tasks">📝 Tâches</button>
+  </div>
+
+  <!-- PAGE: CALENDRIER -->
+  <div class="page active" id="page-calendar">
+    <h2>Mes Séances</h2>
+    <div class="week-nav">
+      <button id="prevWeek">◀</button>
+      <span id="weekLabel"></span>
+      <button id="nextWeek">▶</button>
     </div>
-    <ul class="task-list" id="taskList"></ul>
-    <p class="empty" id="emptyMsg">Aucune tâche pour le moment !</p>
+    <div class="week-grid">
+      <div class="day-header">Lun</div><div class="day-header">Mar</div><div class="day-header">Mer</div>
+      <div class="day-header">Jeu</div><div class="day-header">Ven</div><div class="day-header">Sam</div><div class="day-header">Dim</div>
+      <div class="day-cell" id="d0"></div><div class="day-cell" id="d1"></div><div class="day-cell" id="d2"></div>
+      <div class="day-cell" id="d3"></div><div class="day-cell" id="d4"></div><div class="day-cell" id="d5"></div><div class="day-cell" id="d6"></div>
+    </div>
+    <div style="text-align:center;">
+      <button class="btn btn-primary" id="addSessionBtn">+ Nouvelle Séance</button>
+    </div>
+  </div>
+
+  <!-- PAGE: TOP PERF -->
+  <div class="page" id="page-topperf">
+    <h2>🏆 Meilleures Performances</h2>
+    <div id="perfList"></div>
+    <p class="empty" id="perfEmpty">Aucune perf enregistrée. Ajoute des séances !</p>
+  </div>
+
+  <!-- PAGE: TÂCHES -->
+  <div class="page" id="page-tasks">
+    <h2>📝 Tâches</h2>
+    <div style="display:flex;gap:8px;margin-bottom:24px;">
+      <input type="text" id="taskInput" placeholder="Nouvelle tâche..." maxlength="500" style="flex:1;padding:12px 16px;border:2px solid #16213e;border-radius:8px;background:#16213e;color:#eee;font-size:1rem;outline:none;">
+      <button class="btn btn-primary" id="addTaskBtn">Ajouter</button>
+    </div>
+    <ul id="taskList" style="list-style:none;"></ul>
+    <p class="empty" id="taskEmpty">Aucune tâche pour le moment !</p>
+  </div>
+
+  <!-- MODAL: Créer/Éditer séance -->
+  <div class="modal-overlay" id="sessionModal">
+    <div class="modal">
+      <h3 id="modalTitle">Nouvelle Séance</h3>
+      <div class="form-row">
+        <label>Date</label>
+        <input type="date" id="sessionDate">
+      </div>
+      <div class="form-row">
+        <label>Nom de la séance</label>
+        <input type="text" id="sessionName" placeholder="Ex: Push, Pull, Legs..." maxlength="200">
+      </div>
+      <h4 style="color:#aaa;margin:16px 0 8px;">Exercices</h4>
+      <div id="exerciseList"></div>
+      <button class="btn btn-secondary btn-sm" id="addExoBtn" style="margin-bottom:12px;">+ Exercice</button>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="saveSessionBtn">Sauvegarder</button>
+        <button class="btn btn-danger" id="deleteSessionBtn" style="display:none;">Supprimer</button>
+        <button class="btn btn-secondary" id="closeModalBtn">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Détail séance (depuis Top Perf) -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <h3 id="detailTitle"></h3>
+      <p id="detailDate" style="color:#888;margin-bottom:16px;"></p>
+      <div id="detailExercises"></div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="closeDetailBtn">Fermer</button>
+      </div>
+    </div>
   </div>
 
   <script>
-    const taskInput = document.getElementById('taskInput');
-    const addBtn = document.getElementById('addBtn');
-    const taskList = document.getElementById('taskList');
-    const emptyMsg = document.getElementById('emptyMsg');
+    // --- STATE ---
+    let sessions = [];
+    let currentWeekStart = getMonday(new Date());
+    let editingSessionId = null;
 
-    async function loadTasks() {
-      const res = await fetch('/api/tasks');
-      const tasks = await res.json();
-      renderTasks(tasks);
+    // --- NAV ---
+    document.querySelectorAll('.nav button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page-' + btn.dataset.page).classList.add('active');
+        if (btn.dataset.page === 'topperf') loadPerfs();
+      });
+    });
+
+    // --- UTILS ---
+    function getMonday(d) {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      date.setDate(diff);
+      date.setHours(0,0,0,0);
+      return date;
     }
 
-    function renderTasks(tasks) {
+    function formatDate(d) {
+      return d.toISOString().slice(0, 10);
+    }
+
+    function frDate(str) {
+      const [y, m, d] = str.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    function frDateRange(start) {
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      const opts = { day: 'numeric', month: 'short' };
+      return `${start.toLocaleDateString('fr-FR', opts)} — ${end.toLocaleDateString('fr-FR', opts)} ${end.getFullYear()}`;
+    }
+
+    // --- CALENDAR ---
+    function renderWeek() {
+      document.getElementById('weekLabel').textContent = frDateRange(currentWeekStart);
+      const today = formatDate(new Date());
+      for (let i = 0; i < 7; i++) {
+        const cell = document.getElementById('d' + i);
+        const d = new Date(currentWeekStart);
+        d.setDate(d.getDate() + i);
+        const dateStr = formatDate(d);
+        cell.className = 'day-cell' + (dateStr === today ? ' today' : '');
+        cell.dataset.date = dateStr;
+        const daySessions = sessions.filter(s => s.date === dateStr);
+        cell.innerHTML = `<div class="day-num">${d.getDate()}</div>`;
+        daySessions.forEach(s => {
+          cell.innerHTML += `<div class="session-dot" data-id="${s.id}">${s.name}</div>`;
+        });
+        cell.onclick = (e) => {
+          const dot = e.target.closest('.session-dot');
+          if (dot) {
+            openEditSession(dot.dataset.id);
+          } else {
+            openNewSession(dateStr);
+          }
+        };
+      }
+    }
+
+    document.getElementById('prevWeek').onclick = () => {
+      currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+      renderWeek();
+    };
+    document.getElementById('nextWeek').onclick = () => {
+      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+      renderWeek();
+    };
+
+    // --- SESSION MODAL ---
+    function openNewSession(date) {
+      editingSessionId = null;
+      document.getElementById('modalTitle').textContent = 'Nouvelle Séance';
+      document.getElementById('sessionDate').value = date || formatDate(new Date());
+      document.getElementById('sessionName').value = '';
+      document.getElementById('exerciseList').innerHTML = '';
+      document.getElementById('deleteSessionBtn').style.display = 'none';
+      addExerciseBlock();
+      document.getElementById('sessionModal').classList.add('open');
+    }
+
+    function openEditSession(id) {
+      const session = sessions.find(s => s.id === id);
+      if (!session) return;
+      editingSessionId = id;
+      document.getElementById('modalTitle').textContent = 'Modifier la Séance';
+      document.getElementById('sessionDate').value = session.date;
+      document.getElementById('sessionName').value = session.name;
+      document.getElementById('exerciseList').innerHTML = '';
+      document.getElementById('deleteSessionBtn').style.display = 'inline-block';
+      session.exercises.forEach(ex => addExerciseBlock(ex));
+      document.getElementById('sessionModal').classList.add('open');
+    }
+
+    document.getElementById('addSessionBtn').onclick = () => openNewSession();
+    document.getElementById('closeModalBtn').onclick = () => document.getElementById('sessionModal').classList.remove('open');
+
+    function addExerciseBlock(ex) {
+      const div = document.createElement('div');
+      div.className = 'exercise-block';
+      const sets = ex ? ex.sets : [{ reps: '', weight: '' }];
+      div.innerHTML = `
+        <div class="exo-header">
+          <input type="text" class="exo-name" placeholder="Nom de l'exercice" value="${ex ? ex.name : ''}" maxlength="200">
+          <button class="btn btn-danger btn-sm remove-exo">✕</button>
+        </div>
+        <table class="sets-table">
+          <thead><tr><th>Série</th><th>Reps</th><th>Poids (kg)</th><th></th></tr></thead>
+          <tbody>${sets.map((s, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td><input type="number" class="set-reps" value="${s.reps}" min="0" max="9999"></td>
+              <td><input type="number" class="set-weight" value="${s.weight}" min="0" max="9999" step="0.5"></td>
+              <td><button class="btn btn-danger btn-sm remove-set">✕</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        <button class="btn btn-secondary btn-sm add-set" style="margin-top:6px;">+ Série</button>
+      `;
+      div.querySelector('.remove-exo').onclick = () => div.remove();
+      div.querySelector('.add-set').onclick = () => {
+        const tbody = div.querySelector('tbody');
+        const idx = tbody.rows.length + 1;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${idx}</td><td><input type="number" class="set-reps" min="0" max="9999"></td><td><input type="number" class="set-weight" min="0" max="9999" step="0.5"></td><td><button class="btn btn-danger btn-sm remove-set">✕</button></td>`;
+        tr.querySelector('.remove-set').onclick = () => { tr.remove(); renumberSets(div); };
+        tbody.appendChild(tr);
+      };
+      div.querySelectorAll('.remove-set').forEach(btn => {
+        btn.onclick = () => { btn.closest('tr').remove(); renumberSets(div); };
+      });
+      document.getElementById('exerciseList').appendChild(div);
+    }
+
+    function renumberSets(div) {
+      div.querySelectorAll('tbody tr').forEach((tr, i) => { tr.cells[0].textContent = i + 1; });
+    }
+
+    document.getElementById('addExoBtn').onclick = () => addExerciseBlock();
+
+    document.getElementById('saveSessionBtn').onclick = async () => {
+      const date = document.getElementById('sessionDate').value;
+      const name = document.getElementById('sessionName').value.trim();
+      if (!date || !name) return alert('Remplis la date et le nom de la séance');
+      const exercises = [];
+      document.querySelectorAll('.exercise-block').forEach(block => {
+        const exName = block.querySelector('.exo-name').value.trim();
+        if (!exName) return;
+        const sets = [];
+        block.querySelectorAll('tbody tr').forEach(tr => {
+          const reps = tr.querySelector('.set-reps').value;
+          const weight = tr.querySelector('.set-weight').value;
+          if (reps || weight) sets.push({ reps: reps || 0, weight: weight || 0 });
+        });
+        exercises.push({ name: exName, sets });
+      });
+      const body = { date, name, exercises };
+      if (editingSessionId) {
+        await fetch('/api/sessions/' + editingSessionId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      } else {
+        await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      }
+      document.getElementById('sessionModal').classList.remove('open');
+      await loadSessions();
+    };
+
+    document.getElementById('deleteSessionBtn').onclick = async () => {
+      if (!editingSessionId || !confirm('Supprimer cette séance ?')) return;
+      await fetch('/api/sessions/' + editingSessionId, { method: 'DELETE' });
+      document.getElementById('sessionModal').classList.remove('open');
+      await loadSessions();
+    };
+
+    // --- TOP PERF ---
+    async function loadPerfs() {
+      const res = await fetch('/api/top-perfs');
+      const perfs = await res.json();
+      const list = document.getElementById('perfList');
+      const empty = document.getElementById('perfEmpty');
+      list.innerHTML = '';
+      empty.style.display = perfs.length === 0 ? 'block' : 'none';
+      perfs.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'perf-card';
+        div.innerHTML = `
+          <div>
+            <div class="perf-exo">${escapeHtml(p.exercise)}</div>
+            <div class="perf-detail">${frDate(p.date)} · ${escapeHtml(p.sessionName)}</div>
+          </div>
+          <div class="perf-value">${p.weight} kg × ${p.reps}</div>
+        `;
+        div.onclick = () => showSessionDetail(p.sessionId);
+        list.appendChild(div);
+      });
+    }
+
+    async function showSessionDetail(id) {
+      const res = await fetch('/api/sessions/' + id);
+      if (!res.ok) return alert('Séance introuvable');
+      const s = await res.json();
+      document.getElementById('detailTitle').textContent = s.name;
+      document.getElementById('detailDate').textContent = frDate(s.date);
+      const container = document.getElementById('detailExercises');
+      container.innerHTML = '';
+      s.exercises.forEach(ex => {
+        const div = document.createElement('div');
+        div.className = 'session-detail-exo';
+        div.innerHTML = `<h4>${escapeHtml(ex.name)}</h4>
+          <table><thead><tr><th>Série</th><th>Reps</th><th>Poids</th></tr></thead>
+          <tbody>${ex.sets.map((set, i) => `<tr><td>${i+1}</td><td>${set.reps}</td><td>${set.weight} kg</td></tr>`).join('')}</tbody></table>`;
+        container.appendChild(div);
+      });
+      document.getElementById('detailModal').classList.add('open');
+    }
+
+    document.getElementById('closeDetailBtn').onclick = () => document.getElementById('detailModal').classList.remove('open');
+
+    // --- TASKS (existant) ---
+    const taskInput = document.getElementById('taskInput');
+    const taskList = document.getElementById('taskList');
+    const taskEmpty = document.getElementById('taskEmpty');
+
+    async function loadTaskList() {
+      const res = await fetch('/api/tasks');
+      const tasks = await res.json();
+      renderTaskList(tasks);
+    }
+
+    function renderTaskList(tasks) {
       taskList.innerHTML = '';
-      emptyMsg.style.display = tasks.length === 0 ? 'block' : 'none';
+      taskEmpty.style.display = tasks.length === 0 ? 'block' : 'none';
       tasks.forEach((task, index) => {
         const li = document.createElement('li');
-        li.className = 'task-item';
-
+        li.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:#16213e;padding:14px 16px;border-radius:8px;margin-bottom:8px;';
         const span = document.createElement('span');
         span.textContent = task;
-
+        span.style.wordBreak = 'break-word';
         const btn = document.createElement('button');
-        btn.className = 'btn-delete';
-        btn.textContent = '🗑️ Supprimer';
-        btn.addEventListener('click', () => deleteTask(index));
-
+        btn.className = 'btn btn-danger btn-sm';
+        btn.textContent = '🗑️';
+        btn.onclick = async () => {
+          const r = await fetch('/api/tasks/' + index, { method: 'DELETE' });
+          if (r.ok) { const d = await r.json(); renderTaskList(d.tasks); }
+        };
         li.appendChild(span);
         li.appendChild(btn);
         taskList.appendChild(li);
       });
     }
 
-    async function addTask() {
+    document.getElementById('addTaskBtn').onclick = async () => {
       const task = taskInput.value.trim();
       if (!task) return;
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        renderTasks(data.tasks);
-        taskInput.value = '';
-        taskInput.focus();
-      }
+      const r = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task }) });
+      if (r.ok) { const d = await r.json(); renderTaskList(d.tasks); taskInput.value = ''; }
+    };
+    taskInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('addTaskBtn').click(); });
+
+    // --- ESCAPE HTML ---
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
     }
 
-    async function deleteTask(index) {
-      const res = await fetch('/api/tasks/' + index, { method: 'DELETE' });
-      if (res.ok) {
-        const data = await res.json();
-        renderTasks(data.tasks);
-      }
+    // --- LOAD ---
+    async function loadSessions() {
+      const res = await fetch('/api/sessions');
+      sessions = await res.json();
+      renderWeek();
     }
 
-    addBtn.addEventListener('click', addTask);
-    taskInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') addTask();
-    });
-
-    loadTasks();
-
-    // Synchronisation automatique toutes les 3 secondes
-    setInterval(loadTasks, 3000);
+    loadSessions();
+    loadTaskList();
+    setInterval(loadSessions, 5000);
+    setInterval(loadTaskList, 5000);
   </script>
 </body>
 </html>
