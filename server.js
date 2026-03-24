@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 let db, sessionsCol, templatesCol, tasksCol;
 
 async function connectMongo() {
-  const client = new MongoClient(MONGODB_URI, { useUnifiedTopology: true });
+  const client = new MongoClient(MONGODB_URI);
   await client.connect();
   db = client.db(MONGODB_DBNAME);
   sessionsCol = db.collection('sessions');
