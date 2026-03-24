@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+
 const { MongoClient, ObjectId } = require('mongodb');
 const crypto = require('crypto');
 
@@ -103,25 +104,23 @@ app.get('/api/top-perfs', async (req, res) => {
   }
 });
 
-app.delete('/api/sessions/:id', (req, res) => {
-  const idx = data.sessions.findIndex(s => s.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Séance introuvable' });
-  const removed = data.sessions.splice(idx, 1);
-  saveData(data);
-  res.json({ message: 'Séance supprimée', session: removed[0] });
+
+// --- Supprimer une séance (MongoDB) ---
+app.delete('/api/sessions/:id', async (req, res) => {
+  try {
+    const result = await sessionsCol.deleteOne({ id: req.params.id });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'Séance introuvable' });
+    res.json({ message: 'Séance supprimée' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
 });
 
-// --- TEMPLATES API ---
-// Template: { id, name, weekType, sessions: [{ name, dayOfWeek (1=Lun..7=Dim), blocks: [{ type, exercises: [{ name, setsCount }] }] }] }
-app.get('/api/templates', (req, res) => res.json(data.templates));
 
-app.get('/api/templates/:id', (req, res) => {
-  const t = data.templates.find(t => t.id === req.params.id);
-  if (!t) return res.status(404).json({ error: 'Template introuvable' });
-  res.json(t);
-});
+// (Déjà présent plus haut: version MongoDB)
 
-app.post('/api/templates', (req, res) => {
+
+app.post('/api/templates', async (req, res) => {
   const { name, weekType, sessions: tplSessions } = req.body;
   if (!name || !Array.isArray(tplSessions))
     return res.status(400).json({ error: 'Données invalides' });
@@ -142,19 +141,22 @@ app.post('/api/templates', (req, res) => {
       }))
     }))
   };
-  data.templates.push(tpl);
-  saveData(data);
-  res.status(201).json(tpl);
+  try {
+    await templatesCol.insertOne(tpl);
+    res.status(201).json(tpl);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
 });
 
-app.put('/api/templates/:id', (req, res) => {
-  const idx = data.templates.findIndex(t => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Template introuvable' });
+
+app.put('/api/templates/:id', async (req, res) => {
   const { name, weekType, sessions: tplSessions } = req.body;
-  if (name) data.templates[idx].name = name.trim().slice(0, 200);
-  if (weekType !== undefined) data.templates[idx].weekType = (weekType || '').trim().slice(0, 100);
+  const update = {};
+  if (name) update.name = name.trim().slice(0, 200);
+  if (weekType !== undefined) update.weekType = (weekType || '').trim().slice(0, 100);
   if (Array.isArray(tplSessions)) {
-    data.templates[idx].sessions = tplSessions.map(s => ({
+    update.sessions = tplSessions.map(s => ({
       name: (s.name || '').trim().slice(0, 200),
       dayOfWeek: Math.max(1, Math.min(7, parseInt(s.dayOfWeek) || 1)),
       blocks: (s.blocks || []).map(b => ({
@@ -167,54 +169,38 @@ app.put('/api/templates/:id', (req, res) => {
       }))
     }));
   }
-  saveData(data);
-  res.json(data.templates[idx]);
+  try {
+    const result = await templatesCol.findOneAndUpdate(
+      { id: req.params.id },
+      { $set: update },
+      { returnDocument: 'after' }
+    );
+    if (!result.value) return res.status(404).json({ error: 'Template introuvable' });
+    res.json(result.value);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
 });
 
-app.delete('/api/templates/:id', (req, res) => {
-  const idx = data.templates.findIndex(t => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Template introuvable' });
-  data.templates.splice(idx, 1);
-  saveData(data);
-  res.json({ message: 'Template supprimé' });
+
+app.delete('/api/templates/:id', async (req, res) => {
+  try {
+    const result = await templatesCol.deleteOne({ id: req.params.id });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'Template introuvable' });
+    res.json({ message: 'Template supprimé' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
 });
 
-// Appliquer un template à une semaine
-app.post('/api/templates/:id/apply', (req, res) => {
-  const tpl = data.templates.find(t => t.id === req.params.id);
-  if (!tpl) return res.status(404).json({ error: 'Template introuvable' });
-  const { weekStart } = req.body; // "2026-03-23" (lundi)
-  if (!weekStart) return res.status(400).json({ error: 'weekStart requis' });
 
-  const created = [];
-  tpl.sessions.forEach(tplSession => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + (tplSession.dayOfWeek - 1));
-    const dateStr = d.toISOString().slice(0, 10);
-    const session = {
-      id: crypto.randomUUID(),
-      date: dateStr,
-      name: tplSession.name,
-      blocks: tplSession.blocks.map(b => ({
-        type: b.type,
-        exercises: b.exercises.map(ex => ({
-          name: ex.name,
-          rest: ex.rest || 0,
-          sets: Array.from({ length: ex.setsCount }, () => ({ reps: 0, weight: 0 }))
-        }))
-      }))
-    };
-    data.sessions.push(session);
-    created.push(session);
-  });
-  saveData(data);
-  res.status(201).json({ message: `${created.length} séances créées`, sessions: created });
-});
+// (Déjà présent plus haut: version MongoDB)
 
 // --- TOP PERFS API ---
 app.get('/api/top-perfs', (req, res) => {
   const perfs = {};
-  data.sessions.forEach(session => {
+    const sessions = await sessionsCol.find({}).toArray();
+    sessions.forEach(session => {
     const exercises = flattenExercises(session);
     exercises.forEach(ex => {
       const key = ex.name.toLowerCase();
