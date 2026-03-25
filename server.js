@@ -192,7 +192,65 @@ app.delete('/api/templates/:id', async (req, res) => {
   }
 });
 
+// --- GET toutes les séances ---
+app.get('/api/sessions', async (req, res) => {
+  try {
+    const result = await sessionsCol.find({}).toArray();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
+});
 
+// --- GET une séance par id ---
+app.get('/api/sessions/:id', async (req, res) => {
+  try {
+    const session = await sessionsCol.findOne({ id: req.params.id });
+    if (!session) return res.status(404).json({ error: 'Séance introuvable' });
+    res.json(session);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
+});
+
+// --- POST créer une séance ---
+app.post('/api/sessions', async (req, res) => {
+  try {
+    const { date, name, blocks } = req.body;
+    if (!date || !name) return res.status(400).json({ error: 'date et name requis' });
+    const session = { id: crypto.randomUUID(), date, name, blocks: blocks || [] };
+    await sessionsCol.insertOne(session);
+    res.status(201).json(session);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
+});
+
+// --- PUT modifier une séance ---
+app.put('/api/sessions/:id', async (req, res) => {
+  try {
+    const { date, name, blocks } = req.body;
+    const result = await sessionsCol.findOneAndUpdate(
+      { id: req.params.id },
+      { $set: { date, name, blocks } },
+      { returnDocument: 'after' }
+    );
+    if (!result.value) return res.status(404).json({ error: 'Séance introuvable' });
+    res.json(result.value);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
+});
+
+// --- GET tous les templates ---
+app.get('/api/templates', async (req, res) => {
+  try {
+    const result = await templatesCol.find({}).toArray();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
+});
 // (Déjà présent plus haut: version MongoDB)
 
 // --- TOP PERFS API ---
