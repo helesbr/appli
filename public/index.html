@@ -375,6 +375,23 @@
     .wk-set.done .set-idx { background: var(--accent); color: var(--accent-ink); }
     .wk-set .wk-del { width: 28px; height: 28px; background: transparent; border-color: transparent; }
     .wk-exo .add-set { margin-top: 2px; width: 100%; }
+    /* Minuteur de repos */
+    .rest-timer { background: var(--surface-2); border-top: 1px solid var(--violet-line); flex-shrink: 0; animation: toastIn .25s var(--ease); transition: background .3s; }
+    .rt-bar { height: 3px; background: var(--surface-3); }
+    .rt-bar div { height: 100%; width: 100%; background: var(--violet); transition: width .25s linear; }
+    .rt-row { display: flex; align-items: center; gap: 8px; max-width: 560px; margin: 0 auto; padding: 10px 16px; }
+    .rt-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .rt-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--violet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rt-time { font-family: var(--font-display); font-size: 2rem; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .rt-btn { height: 42px; min-width: 50px; padding: 0 10px; border-radius: 12px; background: var(--surface-3); border: 1px solid var(--border-strong); font-size: 0.85rem; font-weight: 700; transition: transform .12s; }
+    .rt-btn:active { transform: scale(0.94); }
+    .rt-skip { background: var(--violet-soft); color: var(--violet); border-color: var(--violet-line); }
+    .rest-timer.finished { background: var(--accent); border-top-color: var(--accent); }
+    .rest-timer.finished .rt-label, .rest-timer.finished .rt-time { color: var(--accent-ink); }
+    .rest-timer.finished .rt-bar { display: none; }
+    .rest-timer.finished .rt-btn { background: rgba(0,0,0,0.12); border-color: rgba(0,0,0,0.15); color: var(--accent-ink); }
+    button.rest-pill { border: 1px solid transparent; transition: border-color .2s, color .2s; }
+    button.rest-pill:hover, button.rest-pill:active { border-color: var(--violet-line); color: var(--violet); }
     .wk-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); }
     .wk-foot .btn { display: flex; width: 100%; max-width: 528px; margin: 0 auto; }
     .start-wk { margin-bottom: 16px; }
@@ -822,6 +839,18 @@
       <div class="wk-inner">
         <div id="wkBody"></div>
         <button class="btn btn-ghost btn-block" id="wkAddExo"><svg class="ic"><use href="#i-plus"/></svg>Ajouter un exercice</button>
+      </div>
+    </div>
+    <div class="rest-timer" id="restTimer" hidden>
+      <div class="rt-bar"><div id="rtBar"></div></div>
+      <div class="rt-row">
+        <div class="rt-info">
+          <span class="rt-label" id="rtLabel">Repos</span>
+          <span class="rt-time" id="rtTime">0:00</span>
+        </div>
+        <button class="rt-btn" id="rtMinus" aria-label="Retirer 15 secondes">−15</button>
+        <button class="rt-btn" id="rtPlus" aria-label="Ajouter 15 secondes">+15</button>
+        <button class="rt-btn rt-skip" id="rtSkip">Passer</button>
       </div>
     </div>
     <footer class="wk-foot">
@@ -1341,6 +1370,7 @@
     // ===========================================
     // MODE SÉANCE : remplir les charges à la salle
     // ===========================================
+    const DEFAULT_REST = 90; // secondes, si l'exercice n'a pas de repos défini
     let workout = null;      // copie de la séance en cours
     let wkSaveTimer = null;
 
@@ -1373,11 +1403,15 @@
       document.getElementById('workout').hidden = false;
       document.body.classList.add('modal-open');
       setWkStatus('');
+      stopRest();
       renderWorkout();
       document.querySelector('.wk-scroll').scrollTop = 0;
+      keepAwake();
     }
 
     function hideWorkout() {
+      stopRest();
+      releaseAwake();
       document.getElementById('workout').hidden = true;
       if (!document.querySelector('.modal-overlay.open')) document.body.classList.remove('modal-open');
       workout = null;
@@ -1403,7 +1437,7 @@
           card.innerHTML = `
             <div class="wk-exo-head">
               <input class="wk-exo-name" data-field="name" value="${escapeHtml(ex.name)}" placeholder="Nom de l'exercice" maxlength="200">
-              ${ex.rest ? `<span class="rest-pill">${icon('timer')}${escapeHtml(ex.rest)}s</span>` : ''}
+              <button class="rest-pill" data-act="rest" title="Lancer le repos">${icon('timer')}${escapeHtml(parseInt(ex.rest) || DEFAULT_REST)}s</button>
               <button class="icon-btn danger" data-act="del-exo" aria-label="Retirer l'exercice">${icon('trash','ic-sm')}</button>
             </div>
             ${last ? `<div class="wk-last">${icon('history')}<span>Dernière fois (${frDate(last.date).slice(0,5)}) : ${last.sets.map(st => `<b>${escapeHtml(blankZero(st.weight)||0)}</b> kg × ${escapeHtml(blankZero(st.reps)||0)}`).join(' · ')}</span></div>` : ''}
@@ -1485,11 +1519,25 @@
       if (!btn || !workout) return;
       const t = wkLocate(btn);
       const act = btn.dataset.act;
+      let restAfter = null;
+      if (act === 'rest') {
+        unlockAudio();
+        startRest(parseInt(t.ex.rest) || DEFAULT_REST, t.ex.name);
+        return;
+      }
       if (act === 'check') {
         t.set.done = !t.set.done;
         // Valider sans saisir les reps = objectif atteint
         if (t.set.done && blankZero(t.set.reps) === '' && parseInt(t.set.target)) t.set.reps = String(parseInt(t.set.target));
-        if (t.set.done && navigator.vibrate) navigator.vibrate(20);
+        if (t.set.done) {
+          if (navigator.vibrate) navigator.vibrate(20);
+          unlockAudio();
+          // En superset, le repos se prend à la fin du tour (dernier exercice du bloc)
+          if (t.block.type !== 'superset') restAfter = { seconds: parseInt(t.ex.rest) || DEFAULT_REST, label: t.ex.name };
+          else if (t.ei === t.block.exercises.length - 1) {
+            restAfter = { seconds: Math.max(...t.block.exercises.map(e => parseInt(e.rest) || 0)) || DEFAULT_REST, label: 'Superset' };
+          }
+        }
       } else if (act === 'del-set') {
         t.ex.sets.splice(t.si, 1);
       } else if (act === 'add-set') {
@@ -1502,6 +1550,95 @@
       }
       renderWorkout();
       scheduleWorkoutSave();
+      // Pas de repos après la toute dernière série
+      if (restAfter && updateWorkoutProgress() > 0) startRest(restAfter.seconds, restAfter.label);
+    });
+
+    // --- MINUTEUR DE REPOS ---
+    let rest = null;      // { endAt, total, label, timer, finished }
+    let audioCtx = null;
+    let wakeLock = null;
+    const restEl = document.getElementById('restTimer');
+
+    // L'audio doit être activé pendant un geste de l'utilisateur (iOS)
+    function unlockAudio() {
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {}
+    }
+    function beep() {
+      if (!audioCtx) return;
+      [0, 0.22, 0.44].forEach((t, i) => {
+        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.frequency.value = i === 2 ? 1320 : 880;
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        const start = audioCtx.currentTime + t;
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.3, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+        osc.start(start); osc.stop(start + 0.2);
+      });
+    }
+    function fmtClock(sec) {
+      sec = Math.max(0, Math.ceil(sec));
+      return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    }
+    function startRest(seconds, label) {
+      stopRest();
+      rest = { endAt: Date.now() + seconds * 1000, total: seconds, label, finished: false };
+      document.getElementById('rtLabel').textContent = 'Repos · ' + (label || 'exercice');
+      restEl.classList.remove('finished');
+      restEl.hidden = false;
+      rest.timer = setInterval(tickRest, 250);
+      tickRest();
+    }
+    // Calculé à partir de l'heure de fin : reste juste même si le téléphone met l'appli en pause
+    function tickRest() {
+      if (!rest) return;
+      const left = (rest.endAt - Date.now()) / 1000;
+      document.getElementById('rtTime').textContent = fmtClock(left);
+      document.getElementById('rtBar').style.width = Math.max(0, Math.min(100, left / rest.total * 100)) + '%';
+      if (left <= 0 && !rest.finished) {
+        rest.finished = true;
+        restEl.classList.add('finished');
+        document.getElementById('rtLabel').textContent = 'Repos terminé · c\'est reparti !';
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        beep();
+        const ended = rest;
+        setTimeout(() => { if (rest === ended) stopRest(); }, 6000);
+      }
+    }
+    function stopRest() {
+      if (rest) clearInterval(rest.timer);
+      rest = null;
+      restEl.hidden = true;
+    }
+    function adjustRest(delta) {
+      if (!rest) return;
+      if (rest.finished) {
+        if (delta > 0) startRest(delta, rest.label);
+        return;
+      }
+      rest.endAt += delta * 1000;
+      rest.total = Math.max(rest.total, (rest.endAt - Date.now()) / 1000);
+      tickRest();
+    }
+    document.getElementById('rtMinus').onclick = () => adjustRest(-15);
+    document.getElementById('rtPlus').onclick = () => adjustRest(15);
+    document.getElementById('rtSkip').onclick = stopRest;
+
+    // Garde l'écran allumé pendant la séance (si le navigateur le permet)
+    async function keepAwake() {
+      try { if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+      if (wakeLock) wakeLock.addEventListener('release', () => { wakeLock = null; }, { once: true });
+    }
+    function releaseAwake() {
+      if (wakeLock) wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && workout) { keepAwake(); tickRest(); }
     });
 
     document.getElementById('wkAddExo').onclick = () => {
