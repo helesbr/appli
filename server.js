@@ -174,8 +174,8 @@ app.put('/api/templates/:id', async (req, res) => {
       { $set: update },
       { returnDocument: 'after' }
     );
-    if (!result.value) return res.status(404).json({ error: 'Template introuvable' });
-    res.json(result.value);
+    if (!result) return res.status(404).json({ error: 'Template introuvable' });
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: 'Erreur MongoDB' });
   }
@@ -235,8 +235,8 @@ app.put('/api/sessions/:id', async (req, res) => {
       { $set: { date, name, blocks } },
       { returnDocument: 'after' }
     );
-    if (!result.value) return res.status(404).json({ error: 'Séance introuvable' });
-    res.json(result.value);
+    if (!result) return res.status(404).json({ error: 'Séance introuvable' });
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: 'Erreur MongoDB' });
   }
