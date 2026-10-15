@@ -296,6 +296,89 @@
     .session-dot .s-name { font-weight: 600; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
     .session-dot .s-name::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; box-shadow: 0 0 10px rgba(200,245,59,0.6); }
     .session-dot .s-meta { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+    .session-dot .s-info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .session-dot .s-info .s-meta { padding-left: 16px; }
+    .chip-play, .s-done {
+      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+      display: grid; place-items: center;
+    }
+    .chip-play { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 16px rgba(200,245,59,0.25); transition: transform .12s; }
+    .chip-play:active { transform: scale(0.92); }
+    .chip-play .ic { fill: currentColor; }
+    .s-done { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); }
+    .session-dot.completed .s-name::before { background: var(--subtle); box-shadow: none; }
+
+    /* --- MODE SÉANCE --- */
+    .workout {
+      position: fixed; inset: 0; z-index: 300;
+      display: flex; flex-direction: column;
+      background: var(--bg);
+      animation: sheetUp .35s var(--ease);
+    }
+    .wk-head {
+      display: flex; align-items: center; gap: 12px;
+      padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .wk-title { flex: 1; min-width: 0; }
+    .wk-title h2 { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wk-title p { font-size: 0.8rem; color: var(--muted); }
+    .wk-status { font-size: 0.72rem; font-weight: 600; color: var(--subtle); white-space: nowrap; }
+    .wk-status.error { color: var(--danger); }
+    .wk-progress { height: 3px; background: var(--surface-2); flex-shrink: 0; }
+    .wk-progress div { height: 100%; width: 0; background: var(--accent); transition: width .3s var(--ease); box-shadow: 0 0 12px rgba(200,245,59,0.5); }
+    .wk-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+    .wk-inner { max-width: 560px; margin: 0 auto; padding: 16px 16px 24px; }
+    .wk-exo { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 12px; margin-bottom: 10px; }
+    .block-wrapper.superset .wk-exo { background: var(--surface-2); }
+    .block-wrapper.superset .wk-exo:last-child { margin-bottom: 0; }
+    .wk-exo-head { display: flex; align-items: center; gap: 8px; }
+    .wk-exo-name {
+      flex: 1; min-width: 0; padding: 4px 0;
+      background: transparent; border: none; border-bottom: 1px dashed transparent; outline: none;
+      color: var(--text); font-family: var(--font-display); font-size: 1.15rem; font-weight: 600;
+    }
+    .wk-exo-name:focus { border-bottom-color: var(--accent); }
+    .wk-exo-name::placeholder { color: var(--subtle); }
+    .wk-last {
+      display: flex; gap: 8px; align-items: flex-start;
+      margin-top: 8px; padding: 8px 10px; border-radius: 10px;
+      background: var(--surface-2); color: var(--muted); font-size: 0.78rem; line-height: 1.35;
+    }
+    .block-wrapper.superset .wk-last { background: var(--surface-3); }
+    .wk-last .ic { width: 14px; height: 14px; margin-top: 1px; color: var(--violet); }
+    .wk-last b { color: var(--text); font-weight: 600; }
+    .wk-sets-head, .wk-set { display: grid; grid-template-columns: 28px 38px 1fr 1fr 44px 28px; gap: 6px; align-items: center; }
+    .wk-sets-head { margin: 12px 0 6px; font-size: 0.64rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); text-align: center; }
+    .wk-set { margin-bottom: 6px; }
+    .wk-set input {
+      width: 100%; height: 46px; min-width: 0;
+      border: 1px solid var(--border-strong); border-radius: 12px;
+      background: var(--bg); color: var(--text);
+      text-align: center; font-size: 17px; font-weight: 600; font-family: var(--font);
+      outline: none; -webkit-appearance: none; appearance: none;
+      transition: border-color .2s, background .2s;
+    }
+    .wk-set input:focus { border-color: var(--accent); }
+    .wk-set input::placeholder { color: var(--subtle); font-weight: 500; }
+    .wk-target { font-size: 0.85rem; font-weight: 600; color: var(--muted); text-align: center; }
+    .wk-check {
+      width: 44px; height: 46px; border-radius: 12px;
+      display: grid; place-items: center;
+      background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--subtle);
+      transition: background .2s, color .2s, transform .12s;
+    }
+    .wk-check:active { transform: scale(0.92); }
+    .wk-check .ic { stroke-width: 3; }
+    .wk-set.done .wk-check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .wk-set.done input { border-color: var(--accent-line); background: rgba(200,245,59,0.06); }
+    .wk-set.done .set-idx { background: var(--accent); color: var(--accent-ink); }
+    .wk-set .wk-del { width: 28px; height: 28px; background: transparent; border-color: transparent; }
+    .wk-exo .add-set { margin-top: 2px; width: 100%; }
+    .wk-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); }
+    .wk-foot .btn { display: flex; width: 100%; max-width: 528px; margin: 0 auto; }
+    .start-wk { margin-bottom: 16px; }
+    .start-wk .ic { fill: currentColor; }
 
     /* --- MODAL / SHEET --- */
     .modal-overlay {
@@ -399,7 +482,7 @@
       transition: border-color .2s;
     }
     .unit-input:focus-within { border-color: var(--accent); }
-    .modal .unit-input input[type=number] {
+    .modal .unit-input input[type=number], .modal .unit-input input[type=text] {
       width: 38px; height: 100%;
       padding: 0; border: none; background: transparent; box-shadow: none;
       text-align: center; font-size: 15px; font-weight: 600; color: var(--text);
@@ -493,11 +576,16 @@
     .tpl-blocks .block-wrapper:not(.superset) { margin-bottom: 6px; }
     .tpl-exo-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
     .modal .tpl-exo-row input.tpl-exo-name { flex: 1 1 140px; min-width: 0; height: 40px; }
+    .modal .unit-input input.tpl-exo-reps { width: 46px; }
     @media (max-width: 520px) {
       .tpl-exo-row { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
       .tpl-exo-row:last-child { border-bottom: none; padding-bottom: 0; }
-      .modal .tpl-exo-row input.tpl-exo-name { flex-basis: 100%; }
-      .tpl-exo-row .icon-btn { margin-left: auto; }
+      /* Nom + bouton supprimer sur la 1re ligne, séries / reps / repos sur la 2e */
+      .modal .tpl-exo-row input.tpl-exo-name { flex-basis: calc(100% - 46px); }
+      .tpl-exo-row .icon-btn { order: 1; }
+      .tpl-exo-row .unit-input { order: 2; padding: 0 8px; gap: 2px; }
+      .modal .tpl-exo-row .unit-input input[type=number] { width: 30px; }
+      .modal .tpl-exo-row .unit-input input.tpl-exo-reps { width: 40px; }
     }
 
     /* --- TOP PERF --- */
@@ -619,6 +707,8 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
     <symbol id="i-logo" viewBox="0 0 24 24"><path d="M5 17V7l7 5 7-5v10"/></symbol>
   </svg>
@@ -717,6 +807,28 @@
 
   <div class="toast-stack" id="toasts"></div>
 
+  <!-- MODE SÉANCE -->
+  <div class="workout" id="workout" hidden>
+    <header class="wk-head">
+      <button class="icon-btn lg" id="wkBack" aria-label="Retour"><svg class="ic"><use href="#i-left"/></svg></button>
+      <div class="wk-title">
+        <h2 id="wkTitle"></h2>
+        <p id="wkMeta"></p>
+      </div>
+      <span class="wk-status" id="wkStatus"></span>
+    </header>
+    <div class="wk-progress"><div id="wkBar"></div></div>
+    <div class="wk-scroll">
+      <div class="wk-inner">
+        <div id="wkBody"></div>
+        <button class="btn btn-ghost btn-block" id="wkAddExo"><svg class="ic"><use href="#i-plus"/></svg>Ajouter un exercice</button>
+      </div>
+    </div>
+    <footer class="wk-foot">
+      <button class="btn btn-primary" id="wkFinish"><svg class="ic"><use href="#i-check"/></svg><span id="wkFinishLabel">Terminer la séance</span></button>
+    </footer>
+  </div>
+
   <!-- MODAL: Créer/Éditer séance -->
   <div class="modal-overlay" id="sessionModal">
     <div class="modal">
@@ -726,6 +838,7 @@
         <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
       <div class="modal-body">
+        <button class="btn btn-primary btn-block start-wk" id="startWorkoutBtn"><svg class="ic"><use href="#i-play"/></svg>Lancer la séance</button>
         <div class="form-grid">
           <div class="form-row">
             <label for="sessionDate">Date</label>
@@ -950,6 +1063,7 @@
       return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
     function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+    const blankZero = v => (v === '' || v == null || Number(v) === 0) ? '' : v;
     function sessionStats(s) {
       let exos = 0, sets = 0, volume = 0;
       (s.blocks||[]).forEach(b => (b.exercises||[]).forEach(ex => {
@@ -1015,7 +1129,7 @@
       document.getElementById('todayBtn').hidden = isCurrent;
 
       const today = formatDate(new Date());
-      let totalSessions = 0, totalSets = 0, totalVolume = 0;
+      let totalSessions = 0, doneSessions = 0, totalSets = 0, totalVolume = 0;
       for (let i=0;i<7;i++) {
         const cell = document.getElementById('d'+i);
         const d = new Date(currentWeekStart);
@@ -1027,21 +1141,29 @@
         const chips = daySessions.map(s => {
           const st = sessionStats(s);
           totalSessions++; totalSets += st.sets; totalVolume += st.volume;
-          return `<div class="session-dot" data-id="${escapeHtml(s.id)}">
-            <span class="s-name">${escapeHtml(s.name)}</span>
-            <span class="s-meta">${st.exos} exo${st.exos>1?'s':''} · ${st.sets} séries</span>
+          if (s.completed) doneSessions++;
+          return `<div class="session-dot${s.completed?' completed':''}" data-id="${escapeHtml(s.id)}">
+            <div class="s-info">
+              <span class="s-name">${escapeHtml(s.name)}</span>
+              <span class="s-meta">${s.completed?'Terminée · ':''}${st.exos} exo${st.exos>1?'s':''} · ${st.sets} séries</span>
+            </div>
+            ${s.completed
+              ? `<span class="s-done" title="Séance terminée">${icon('check','ic-sm')}</span>`
+              : `<button class="chip-play" data-play="${escapeHtml(s.id)}" aria-label="Lancer la séance">${icon('play','ic-sm')}</button>`}
           </div>`;
         }).join('');
         cell.innerHTML = `
           <div class="day-meta"><span class="day-name">${DAYS_SHORT[i]}</span><span class="day-num">${d.getDate()}</span></div>
           <div class="day-body">${chips || `<span class="day-empty">${icon('plus')}Repos · ajouter une séance</span>`}</div>`;
         cell.onclick = (e) => {
+          const play = e.target.closest('.chip-play');
+          if (play) return openWorkout(play.dataset.play);
           const dot = e.target.closest('.session-dot');
           if (dot) openEditSession(dot.dataset.id);
           else openNewSession(dateStr);
         };
       }
-      document.getElementById('statSessions').textContent = totalSessions;
+      document.getElementById('statSessions').innerHTML = totalSessions ? `${doneSessions}<small>/${totalSessions}</small>` : '0';
       document.getElementById('statSets').textContent = totalSets;
       document.getElementById('statVolume').innerHTML = formatVolume(totalVolume);
     }
@@ -1120,8 +1242,8 @@
 
     function setRowHTML(i, s) {
       return `<td><span class="set-idx">${i}</span></td>
-        <td><input type="number" class="set-reps" inputmode="numeric" value="${s?escapeHtml(s.reps):''}" min="0" max="9999" placeholder="0"></td>
-        <td><input type="number" class="set-weight" inputmode="decimal" value="${s?escapeHtml(s.weight):''}" min="0" max="9999" step="0.5" placeholder="0"></td>
+        <td><input type="number" class="set-reps" inputmode="numeric" value="${s?escapeHtml(blankZero(s.reps)):''}" min="0" max="9999" placeholder="${s&&s.target?escapeHtml(s.target):'0'}"></td>
+        <td><input type="number" class="set-weight" inputmode="decimal" value="${s?escapeHtml(blankZero(s.weight)):''}" min="0" max="9999" step="0.5" placeholder="0"></td>
         <td><button class="icon-btn danger remove-set" aria-label="Supprimer la série">${icon('x','ic-sm')}</button></td>`;
     }
 
@@ -1138,7 +1260,7 @@
         </div>
         <table class="sets-table">
           <thead><tr><th>#</th><th>Reps</th><th>Kg</th><th></th></tr></thead>
-          <tbody>${sets.map((s,i)=>`<tr>${setRowHTML(i+1, s)}</tr>`).join('')}</tbody>
+          <tbody>${sets.map((s,i)=>`<tr data-target="${escapeHtml(s.target||'')}" data-done="${s.done?'1':''}">${setRowHTML(i+1, s)}</tr>`).join('')}</tbody>
         </table>
         <button class="btn btn-ghost btn-sm add-set">${icon('plus','ic-sm')}Série</button>
       `;
@@ -1146,8 +1268,9 @@
       div.querySelector('.add-set').onclick = () => {
         const tbody=div.querySelector('tbody'); const idx=tbody.rows.length+1;
         const last = tbody.rows[tbody.rows.length-1];
-        const prev = last ? { reps: last.querySelector('.set-reps').value, weight: last.querySelector('.set-weight').value } : null;
+        const prev = last ? { reps: last.querySelector('.set-reps').value, weight: last.querySelector('.set-weight').value, target: last.dataset.target } : null;
         const tr=document.createElement('tr');
+        tr.dataset.target = prev && prev.target || '';
         tr.innerHTML=setRowHTML(idx, prev);
         tr.querySelector('.remove-set').onclick=()=>{tr.remove();renumberSets(div);};
         tbody.appendChild(tr);
@@ -1160,10 +1283,11 @@
       div.querySelectorAll('tbody tr').forEach((tr,i)=>{tr.querySelector('.set-idx').textContent=i+1;});
     }
 
-    document.getElementById('saveSessionBtn').onclick = async () => {
+    // Lit le formulaire de séance ; renvoie null s'il manque la date ou le nom
+    function collectSessionForm() {
       const date = document.getElementById('sessionDate').value;
       const name = document.getElementById('sessionName').value.trim();
-      if (!date||!name) return toast('Remplis la date et le nom', 'error');
+      if (!date||!name) { toast('Remplis la date et le nom', 'error'); return null; }
       const blocks = [];
       document.querySelectorAll('#blockList .block-wrapper').forEach(wrapper => {
         const type = wrapper.dataset.type;
@@ -1175,22 +1299,35 @@
           block.querySelectorAll('tbody tr').forEach(tr => {
             const reps=tr.querySelector('.set-reps').value;
             const weight=tr.querySelector('.set-weight').value;
-            sets.push({reps:reps||0, weight:weight||0});
+            sets.push({reps, weight, target: tr.dataset.target || '', done: tr.dataset.done === '1'});
           });
           const rest = parseInt(block.querySelector('.exo-rest').value) || 0;
           exercises.push({name:exName, sets, rest});
         });
         if (exercises.length>0) blocks.push({type, exercises});
       });
-      const body = {date, name, blocks};
-      if (editingSessionId) {
-        await api('/api/sessions/'+editingSessionId,{method:'PUT',body:body});
-      } else {
-        await api('/api/sessions',{method:'POST',body:body});
-      }
+      return {date, name, blocks};
+    }
+    async function persistSessionForm() {
+      const body = collectSessionForm();
+      if (!body) return null;
+      return editingSessionId
+        ? api('/api/sessions/'+editingSessionId,{method:'PUT',body:body})
+        : api('/api/sessions',{method:'POST',body:body});
+    }
+
+    document.getElementById('saveSessionBtn').onclick = async () => {
+      if (!await persistSessionForm()) return;
       closeModal('sessionModal');
       toast('Séance enregistrée');
       await loadSessions();
+    };
+    document.getElementById('startWorkoutBtn').onclick = async () => {
+      const saved = await persistSessionForm();
+      if (!saved) return;
+      closeModal('sessionModal');
+      await loadSessions();
+      openWorkout(saved.id);
     };
 
     document.getElementById('deleteSessionBtn').onclick = async () => {
@@ -1199,6 +1336,204 @@
       closeModal('sessionModal');
       toast('Séance supprimée');
       await loadSessions();
+    };
+
+    // ===========================================
+    // MODE SÉANCE : remplir les charges à la salle
+    // ===========================================
+    let workout = null;      // copie de la séance en cours
+    let wkSaveTimer = null;
+
+    // Dernière fois où l'exercice a été fait (séries avec des données), avant cette séance
+    function lastPerformance(name, beforeDate, excludeId) {
+      const key = (name || '').trim().toLowerCase();
+      if (!key) return null;
+      let best = null;
+      sessions.forEach(s => {
+        if (s.id === excludeId || s.date > beforeDate) return;
+        (s.blocks||[]).forEach(b => (b.exercises||[]).forEach(ex => {
+          if ((ex.name||'').trim().toLowerCase() !== key) return;
+          const sets = (ex.sets||[]).filter(st => num(st.weight) > 0 || num(st.reps) > 0);
+          if (sets.length && (!best || s.date > best.date)) best = { date: s.date, sets };
+        }));
+      });
+      return best;
+    }
+    function frDay(str) {
+      const [y,m,d] = str.split('-').map(Number);
+      return new Date(y, m-1, d).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
+    }
+
+    function openWorkout(id) {
+      const s = sessions.find(x => x.id === id);
+      if (!s) return toast('Séance introuvable', 'error');
+      workout = JSON.parse(JSON.stringify(s));
+      workout.blocks = workout.blocks || [];
+      closeModal('sessionModal');
+      document.getElementById('workout').hidden = false;
+      document.body.classList.add('modal-open');
+      setWkStatus('');
+      renderWorkout();
+      document.querySelector('.wk-scroll').scrollTop = 0;
+    }
+
+    function hideWorkout() {
+      document.getElementById('workout').hidden = true;
+      if (!document.querySelector('.modal-overlay.open')) document.body.classList.remove('modal-open');
+      workout = null;
+      renderWeek();
+    }
+
+    function renderWorkout() {
+      const w = workout;
+      document.getElementById('wkTitle').textContent = w.name;
+      document.getElementById('wkFinishLabel').textContent = w.completed ? 'Enregistrer et fermer' : 'Terminer la séance';
+      const body = document.getElementById('wkBody');
+      body.innerHTML = '';
+      w.blocks.forEach((block, bi) => {
+        const bDiv = document.createElement('div');
+        bDiv.className = 'block-wrapper' + (block.type === 'superset' ? ' superset' : '');
+        if (block.type === 'superset') bDiv.innerHTML = `<div class="block-header"><span class="block-tag">${icon('zap')}Superset</span></div>`;
+        (block.exercises||[]).forEach((ex, ei) => {
+          ex.sets = ex.sets || [];
+          const last = lastPerformance(ex.name, w.date, w.id);
+          const card = document.createElement('div');
+          card.className = 'wk-exo';
+          card.dataset.b = bi; card.dataset.e = ei;
+          card.innerHTML = `
+            <div class="wk-exo-head">
+              <input class="wk-exo-name" data-field="name" value="${escapeHtml(ex.name)}" placeholder="Nom de l'exercice" maxlength="200">
+              ${ex.rest ? `<span class="rest-pill">${icon('timer')}${escapeHtml(ex.rest)}s</span>` : ''}
+              <button class="icon-btn danger" data-act="del-exo" aria-label="Retirer l'exercice">${icon('trash','ic-sm')}</button>
+            </div>
+            ${last ? `<div class="wk-last">${icon('history')}<span>Dernière fois (${frDate(last.date).slice(0,5)}) : ${last.sets.map(st => `<b>${escapeHtml(blankZero(st.weight)||0)}</b> kg × ${escapeHtml(blankZero(st.reps)||0)}`).join(' · ')}</span></div>` : ''}
+            <div class="wk-sets-head"><span>#</span><span>Obj.</span><span>Reps</span><span>Kg</span><span>OK</span><span></span></div>
+            ${ex.sets.map((st, si) => `
+              <div class="wk-set${st.done ? ' done' : ''}" data-s="${si}">
+                <span class="set-idx">${si + 1}</span>
+                <span class="wk-target">${st.target ? escapeHtml(st.target) : '–'}</span>
+                <input type="number" inputmode="numeric" data-field="reps" min="0" max="9999" value="${escapeHtml(blankZero(st.reps))}" placeholder="${escapeHtml(st.target || '0')}" aria-label="Reps">
+                <input type="number" inputmode="decimal" step="0.5" min="0" max="9999" data-field="weight" value="${escapeHtml(blankZero(st.weight))}" placeholder="${escapeHtml(last && last.sets[si] ? blankZero(last.sets[si].weight) || '0' : '0')}" aria-label="Charge en kg">
+                <button class="wk-check" data-act="check" aria-label="Valider la série">${icon('check')}</button>
+                <button class="icon-btn danger wk-del" data-act="del-set" aria-label="Supprimer la série">${icon('x','ic-sm')}</button>
+              </div>`).join('')}
+            <button class="btn btn-ghost btn-sm add-set" data-act="add-set">${icon('plus','ic-sm')}Série</button>`;
+          bDiv.appendChild(card);
+        });
+        body.appendChild(bDiv);
+      });
+      if (!w.blocks.length) body.innerHTML = '<p class="empty">Aucun exercice. Ajoute-en un ci-dessous.</p>';
+      updateWorkoutProgress();
+    }
+
+    function updateWorkoutProgress() {
+      let total = 0, done = 0;
+      workout.blocks.forEach(b => (b.exercises||[]).forEach(ex => (ex.sets||[]).forEach(st => { total++; if (st.done) done++; })));
+      document.getElementById('wkMeta').textContent = `${frDay(workout.date)} · ${done}/${total} séries`;
+      document.getElementById('wkBar').style.width = total ? (done / total * 100) + '%' : '0%';
+      return total - done;
+    }
+
+    function setWkStatus(text, error) {
+      const el = document.getElementById('wkStatus');
+      el.textContent = text;
+      el.classList.toggle('error', !!error);
+    }
+    function scheduleWorkoutSave() {
+      setWkStatus('Modifié…');
+      clearTimeout(wkSaveTimer);
+      wkSaveTimer = setTimeout(() => saveWorkout().catch(() => {}), 800);
+    }
+    async function saveWorkout() {
+      clearTimeout(wkSaveTimer);
+      wkSaveTimer = null;
+      if (!workout) return;
+      const w = workout;
+      const body = { date: w.date, name: w.name, blocks: w.blocks, completed: !!w.completed };
+      setWkStatus('Enregistrement…');
+      try {
+        await api('/api/sessions/' + w.id, { method: 'PUT', body });
+        const i = sessions.findIndex(s => s.id === w.id);
+        if (i >= 0) sessions[i] = { ...sessions[i], ...JSON.parse(JSON.stringify(body)) };
+        if (workout === w) setWkStatus('Enregistré ✓');
+      } catch (e) {
+        if (workout === w) setWkStatus('Non enregistré', true);
+        throw e;
+      }
+    }
+
+    // Retrouve l'exercice / la série correspondant à un élément de l'écran
+    function wkLocate(el) {
+      const card = el.closest('.wk-exo');
+      const bi = +card.dataset.b, ei = +card.dataset.e;
+      const block = workout.blocks[bi], ex = block.exercises[ei];
+      const row = el.closest('.wk-set');
+      const si = row ? +row.dataset.s : -1;
+      return { bi, ei, si, block, ex, set: row ? ex.sets[si] : null };
+    }
+    const wkBody = document.getElementById('wkBody');
+    wkBody.addEventListener('input', e => {
+      const field = e.target.dataset.field;
+      if (!field || !workout) return;
+      const t = wkLocate(e.target);
+      if (field === 'name') t.ex.name = e.target.value;
+      else t.set[field] = e.target.value;
+      scheduleWorkoutSave();
+    });
+    wkBody.addEventListener('click', e => {
+      const btn = e.target.closest('[data-act]');
+      if (!btn || !workout) return;
+      const t = wkLocate(btn);
+      const act = btn.dataset.act;
+      if (act === 'check') {
+        t.set.done = !t.set.done;
+        // Valider sans saisir les reps = objectif atteint
+        if (t.set.done && blankZero(t.set.reps) === '' && parseInt(t.set.target)) t.set.reps = String(parseInt(t.set.target));
+        if (t.set.done && navigator.vibrate) navigator.vibrate(20);
+      } else if (act === 'del-set') {
+        t.ex.sets.splice(t.si, 1);
+      } else if (act === 'add-set') {
+        const prev = t.ex.sets[t.ex.sets.length - 1];
+        t.ex.sets.push({ reps: '', weight: prev ? prev.weight : '', target: prev ? prev.target || '' : '', done: false });
+      } else if (act === 'del-exo') {
+        if (!confirm(`Retirer « ${t.ex.name || 'cet exercice'} » de la séance ?`)) return;
+        t.block.exercises.splice(t.ei, 1);
+        if (!t.block.exercises.length) workout.blocks.splice(t.bi, 1);
+      }
+      renderWorkout();
+      scheduleWorkoutSave();
+    });
+
+    document.getElementById('wkAddExo').onclick = () => {
+      workout.blocks.push({ type: 'single', exercises: [{ name: '', rest: 0, sets: [{ reps: '', weight: '', target: '', done: false }] }] });
+      renderWorkout();
+      scheduleWorkoutSave();
+      const names = wkBody.querySelectorAll('.wk-exo-name');
+      const input = names[names.length - 1];
+      input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      input.focus();
+    };
+
+    document.getElementById('wkBack').onclick = async () => {
+      if (wkSaveTimer) {
+        try { await saveWorkout(); }
+        catch (e) { if (!confirm('Les dernières modifications n\'ont pas pu être enregistrées. Quitter quand même ?')) return; }
+      }
+      hideWorkout();
+    };
+
+    document.getElementById('wkFinish').onclick = async () => {
+      const remaining = updateWorkoutProgress();
+      if (!workout.completed && remaining > 0 &&
+          !confirm(`${remaining} série${remaining > 1 ? 's' : ''} non validée${remaining > 1 ? 's' : ''}. Terminer quand même ?`)) return;
+      const wasCompleted = workout.completed;
+      workout.blocks.forEach(b => { b.exercises = (b.exercises||[]).filter(ex => ex.name.trim()); });
+      workout.blocks = workout.blocks.filter(b => b.exercises.length);
+      workout.completed = true;
+      await saveWorkout();
+      hideWorkout();
+      toast(wasCompleted ? 'Séance enregistrée' : 'Séance terminée 💪');
+      loadSessions().catch(() => {});
     };
 
     // ===========================================
@@ -1318,6 +1653,7 @@
       div.innerHTML = `
         <input type="text" class="tpl-exo-name" placeholder="Exercice" value="${ex?escapeHtml(ex.name):''}" maxlength="200">
         <label class="unit-input" title="Séries"><input type="number" class="tpl-exo-sets" inputmode="numeric" placeholder="4" value="${ex?escapeHtml(ex.setsCount):4}" min="1" max="20"><span>séries</span></label>
+        <label class="unit-input" title="Reps visées (ex : 8 ou 8-10)"><span>×</span><input type="text" class="tpl-exo-reps" inputmode="numeric" placeholder="8" value="${ex&&ex.reps?escapeHtml(ex.reps):''}" maxlength="10"><span>reps</span></label>
         <label class="unit-input" title="Repos">${icon('timer')}<input type="number" class="tpl-exo-rest" inputmode="numeric" placeholder="–" value="${ex&&ex.rest?escapeHtml(ex.rest):''}" min="0" max="3600"><span>s</span></label>
         <button class="icon-btn danger" aria-label="Supprimer l'exercice">${icon('x','ic-sm')}</button>
       `;
@@ -1342,7 +1678,8 @@
             const eName = exDiv.querySelector('.tpl-exo-name').value.trim();
             const setsCount = parseInt(exDiv.querySelector('.tpl-exo-sets').value)||4;
             const rest = parseInt(exDiv.querySelector('.tpl-exo-rest').value) || 0;
-            if (eName) exercises.push({name:eName, setsCount, rest});
+            const reps = exDiv.querySelector('.tpl-exo-reps').value.trim();
+            if (eName) exercises.push({name:eName, setsCount, reps, rest});
           });
           if (exercises.length>0) blocks.push({type, exercises});
         });
