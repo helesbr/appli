@@ -25,7 +25,21 @@ async function connectMongo() {
   console.log('Connecté à MongoDB Atlas');
 }
 
-connectMongo().catch(e => { console.error('Erreur MongoDB:', e); process.exit(1); });
+const mongoReady = connectMongo();
+mongoReady.catch(e => {
+  console.error('Erreur MongoDB:', e);
+  if (!process.env.VERCEL) process.exit(1);
+});
+
+// Sur Vercel, une requête peut arriver avant la fin de la connexion
+app.use('/api', async (req, res, next) => {
+  try {
+    await mongoReady;
+    next();
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur MongoDB' });
+  }
+});
 
 // --- Appliquer un template à une semaine (MongoDB) ---
 app.post('/api/templates/:id/apply', async (req, res) => {
@@ -255,6 +269,10 @@ app.get('/api/templates', async (req, res) => {
 
 // --- TOP PERFS API ---
 
-app.listen(PORT, () => {
-  console.log(`Serveur lancé sur http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Serveur lancé sur http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
