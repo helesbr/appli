@@ -3,417 +3,781 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#09090b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MoggTrack">
   <title>MoggTrack</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23c8f53b'/%3E%3Cpath d='M18 40V24l14 10 14-10v16' fill='none' stroke='%230b0d02' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #09090b;
+      --surface: #131317;
+      --surface-2: #1b1b21;
+      --surface-3: #24242b;
+      --border: rgba(255,255,255,0.07);
+      --border-strong: rgba(255,255,255,0.13);
+      --text: #f4f4f5;
+      --muted: #a1a1aa;
+      --subtle: #71717a;
+      --accent: #c8f53b;
+      --accent-ink: #0b0d02;
+      --accent-soft: rgba(200,245,59,0.10);
+      --accent-line: rgba(200,245,59,0.28);
+      --violet: #a78bfa;
+      --violet-soft: rgba(167,139,250,0.10);
+      --violet-line: rgba(167,139,250,0.35);
+      --danger: #fb7185;
+      --danger-soft: rgba(251,113,133,0.12);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-display: 'Space Grotesk', 'Inter', sans-serif;
+      --ease: cubic-bezier(.2,.8,.2,1);
+      --tabbar-h: 68px;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    [hidden] { display: none !important; }
+
     html, body {
-      font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
-      background: #1a1a2e;
-      color: #eee;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
-      width: 100vw;
       overscroll-behavior-y: none;
       -webkit-font-smoothing: antialiased;
       -webkit-touch-callout: none;
       touch-action: manipulation;
-      padding-bottom: env(safe-area-inset-bottom);
+      font-size: 16px;
+      line-height: 1.4;
     }
+    body {
+      background:
+        radial-gradient(900px 420px at 15% -120px, rgba(200,245,59,0.09), transparent 70%),
+        radial-gradient(700px 380px at 100% -60px, rgba(167,139,250,0.10), transparent 70%),
+        var(--bg);
+      background-attachment: fixed;
+    }
+    body.modal-open { overflow: hidden; }
 
-    /* --- NAV --- */
-    .nav {
-      display: flex;
-      justify-content: center;
-      gap: 0;
-      background: #16213e;
-      border-bottom: 2px solid #e94560;
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    input, select { font: inherit; color: inherit; }
+
+    .ic { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .ic-sm { width: 16px; height: 16px; }
+
+    /* --- APP BAR --- */
+    .appbar {
       position: sticky;
       top: 0;
       z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: calc(12px + env(safe-area-inset-top)) 20px 12px;
+      background: rgba(9,9,11,0.72);
+      backdrop-filter: saturate(160%) blur(18px);
+      -webkit-backdrop-filter: saturate(160%) blur(18px);
+      border-bottom: 1px solid var(--border);
     }
-    .nav button {
-      flex: 1;
-      max-width: 200px;
-      padding: 14px 0;
-      background: transparent;
-      color: #888;
-      border: none;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      border-bottom: 3px solid transparent;
+    .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; letter-spacing: -0.02em; }
+    .brand-mark {
+      width: 32px; height: 32px; border-radius: 10px;
+      background: var(--accent); color: var(--accent-ink);
+      display: grid; place-items: center;
+      box-shadow: 0 0 24px rgba(200,245,59,0.35);
     }
-    .nav button.active {
-      color: #e94560;
-      border-bottom-color: #e94560;
-    }
+    .brand-mark .ic { width: 18px; height: 18px; stroke-width: 2.5; }
+    .brand span { color: var(--accent); }
+    .appbar-date { font-size: 0.8rem; color: var(--muted); text-transform: capitalize; }
 
+    /* --- PAGES --- */
     .page {
       display: none;
-      padding: 18px 4vw 24px 4vw;
-      max-width: 520px;
+      padding: 20px 16px calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom));
+      max-width: 560px;
       margin: 0 auto;
-      min-height: 100vh;
-      box-sizing: border-box;
     }
-    .page.active { display: block; }
+    .page.active { display: block; animation: pageIn .35s var(--ease); }
 
-    h2 {
-      text-align: center;
-      color: #e94560;
-      margin-bottom: 18px;
-      font-size: 1.25rem;
-      letter-spacing: 0.01em;
+    .page-head { margin-bottom: 20px; }
+    .eyebrow { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+    .page-head h1 { font-family: var(--font-display); font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+    .page-head p.sub { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+
+    /* --- TAB BAR --- */
+    .tabbar {
+      position: fixed;
+      left: 50%;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      gap: 4px;
+      padding: 6px;
+      width: min(calc(100% - 32px), 420px);
+      height: var(--tabbar-h);
+      background: rgba(22,22,27,0.78);
+      backdrop-filter: saturate(160%) blur(20px);
+      -webkit-backdrop-filter: saturate(160%) blur(20px);
+      border: 1px solid var(--border-strong);
+      border-radius: 22px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+    .tabbar button {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      border-radius: 16px;
+      color: var(--subtle);
+      font-size: 0.7rem;
+      font-weight: 600;
+      transition: color .2s, background .2s;
+    }
+    .tabbar button.active { color: var(--accent); background: var(--accent-soft); }
+    .tabbar button:active { transform: scale(0.96); }
+
+    /* --- BUTTONS --- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 50px;
+      padding: 0 20px;
+      border-radius: 14px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      transition: transform .12s var(--ease), background .2s, border-color .2s, box-shadow .2s;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 24px rgba(200,245,59,0.22); }
+    .btn-primary:hover { background: #d4ff4f; }
+    .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); }
+    .btn-secondary:hover { background: var(--surface-3); }
+    .btn-danger { background: var(--danger-soft); color: var(--danger); }
+    .btn-danger:hover { background: rgba(251,113,133,0.2); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px dashed var(--border-strong); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--subtle); }
+    .btn-violet { background: var(--violet-soft); color: var(--violet); border: 1px dashed var(--violet-line); }
+    .btn-sm { height: 36px; padding: 0 12px; font-size: 0.82rem; border-radius: 10px; gap: 6px; }
+    .btn-block { width: 100%; }
+
+    .icon-btn {
+      width: 36px; height: 36px;
+      display: inline-grid; place-items: center;
+      border-radius: 10px;
+      color: var(--muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      transition: background .2s, color .2s, transform .12s;
+    }
+    .icon-btn:hover { color: var(--text); background: var(--surface-3); }
+    .icon-btn:active { transform: scale(0.94); }
+    .icon-btn.danger:hover { color: var(--danger); background: var(--danger-soft); }
+    .icon-btn.lg { width: 44px; height: 44px; border-radius: 14px; }
+
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+    .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* --- CARDS --- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
     }
 
-    /* --- CALENDAR --- */
+    /* --- WEEK NAV --- */
     .week-nav {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       gap: 10px;
-      margin-bottom: 16px;
+      padding: 8px;
+      margin-bottom: 12px;
     }
-    .week-nav button {
-      background: #533483;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 10px 18px;
-      cursor: pointer;
-      font-size: 1.1rem;
+    .week-nav-center { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+    .week-kicker { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--subtle); }
+    #weekLabel { font-family: var(--font-display); font-weight: 600; font-size: 1rem; user-select: none; }
+    .today-link {
+      display: block;
+      margin: -4px auto 12px;
+      font-size: 0.8rem;
       font-weight: 600;
-      min-width: 44px;
-      min-height: 44px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .week-nav button:active { background: #e94560; }
-    .week-nav span {
-      font-size: 1rem;
-      color: #ccc;
-      min-width: 160px;
-      text-align: center;
-      user-select: none;
+      color: var(--accent);
+      padding: 6px 12px;
     }
 
-    .week-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 4px;
-      margin-bottom: 18px;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .day-header { text-align: center; font-size: 0.75rem; color: #888; padding: 4px 0; }
+    /* --- STATS --- */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .stat { padding: 14px 12px; }
+    .stat-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); }
+    .stat-value { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; }
+    .stat-value small { font-size: 0.8rem; color: var(--muted); font-weight: 500; margin-left: 2px; }
+
+    /* --- WEEK LIST --- */
+    .week-list { display: flex; flex-direction: column; gap: 8px; user-select: none; -webkit-user-select: none; }
     .day-cell {
-      background: #16213e;
-      border-radius: 10px;
-      min-height: 54px;
-      padding: 5px 2px 5px 2px;
+      display: flex;
+      align-items: stretch;
+      gap: 14px;
+      padding: 12px 12px 12px 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
       cursor: pointer;
-      border: 2px solid transparent;
-      transition: border-color 0.2s;
+      transition: border-color .2s, background .2s, transform .12s;
       position: relative;
-      touch-action: manipulation;
     }
-    .day-cell:active { border-color: #533483; }
-    .day-cell.today { border-color: #e94560; }
-    .day-cell .day-num { font-size: 0.8rem; color: #888; margin-bottom: 2px; }
-    .day-cell .session-dot {
-      background: #e94560;
-      color: #fff;
-      font-size: 0.7rem;
-      padding: 2px 6px;
-      border-radius: 5px;
-      display: inline-block;
-      margin-top: 2px;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-weight: 500;
-      letter-spacing: 0.01em;
+    .day-cell:hover { border-color: var(--border-strong); }
+    .day-cell:active { transform: scale(0.99); }
+    .day-cell.today { border-color: var(--accent-line); background: linear-gradient(90deg, rgba(200,245,59,0.06), var(--surface) 60%); }
+    .day-cell.today::before {
+      content: ''; position: absolute; left: -1px; top: 14px; bottom: 14px; width: 3px;
+      border-radius: 0 3px 3px 0; background: var(--accent);
     }
+    .day-meta { width: 48px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .day-name { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--subtle); }
+    .day-num { font-family: var(--font-display); font-size: 1.45rem; font-weight: 600; line-height: 1.1; }
+    .day-cell.today .day-num, .day-cell.today .day-name { color: var(--accent); }
+    .day-cell.past:not(.today) .day-meta { opacity: 0.5; }
+    .day-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+    .day-empty { display: flex; align-items: center; gap: 6px; color: var(--subtle); font-size: 0.85rem; }
+    .day-empty .ic { width: 16px; height: 16px; }
 
-    /* --- MODAL --- */
+    .session-dot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      transition: border-color .2s, background .2s;
+    }
+    .session-dot:hover { border-color: var(--accent-line); background: var(--accent-soft); }
+    .session-dot .s-name { font-weight: 600; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+    .session-dot .s-name::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; box-shadow: 0 0 10px rgba(200,245,59,0.6); }
+    .session-dot .s-meta { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+
+    /* --- MODAL / SHEET --- */
     .modal-overlay {
       display: none;
       position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
       z-index: 200;
       justify-content: center;
-      align-items: flex-start;
-      padding: max(24px, env(safe-area-inset-top)) 0 max(24px, env(safe-area-inset-bottom)) 0;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
+      align-items: flex-end;
     }
-    .modal-overlay.open { display: flex; }
+    .modal-overlay.open { display: flex; animation: fadeIn .2s ease; }
     .modal {
-      background: #16213e;
-      border-radius: 16px;
-      padding: 18px 4vw 18px 4vw;
-      width: 100vw;
-      max-width: 500px;
-      margin: 0 auto;
-      animation: fadeIn 0.25s ease;
-      box-sizing: border-box;
-      box-shadow: 0 8px 32px 0 rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 540px;
+      max-height: 94vh;
+      max-height: 94dvh;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-bottom: none;
+      border-radius: 26px 26px 0 0;
+      box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+      animation: sheetUp .38s var(--ease);
       touch-action: manipulation;
     }
-    .modal h3 { color: #e94560; margin-bottom: 16px; }
-    .form-row { margin-bottom: 12px; }
-    .form-row label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 4px; }
-    .form-row input, .form-row select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 2px solid #1a1a2e;
-      border-radius: 8px;
-      background: #1a1a2e;
-      color: #eee;
-      font-size: 1rem;
-      outline: none;
-    }
-    .form-row input:focus { border-color: #e94560; }
-
-    .exercise-block {
-      background: #1a1a2e;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-    .exercise-block .exo-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .exercise-block .exo-header input { flex: 1; margin-right: 8px; }
-    .sets-table { width: 100%; font-size: 0.9rem; }
-    .sets-table th { color: #888; font-weight: 500; text-align: left; padding: 2px 4px; }
-    .sets-table td { padding: 2px 4px; }
-    .sets-table input { width: 70px; padding: 6px 8px; text-align: center; }
-
-    .btn {
-      padding: 12px 0;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 1.05rem;
-      font-weight: 600;
-      transition: background 0.2s;
-      min-width: 44px;
-      min-height: 44px;
-      width: 100%;
-      margin-bottom: 6px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .btn-primary { background: #e94560; color: #fff; }
-    .btn-primary:hover { background: #c73e54; }
-    .btn-secondary { background: #533483; color: #fff; }
-    .btn-secondary:hover { background: #6b44a0; }
-    .btn-danger { background: #c0392b; color: #fff; }
-    .btn-danger:hover { background: #e74c3c; }
-    .btn-sm {
-      padding: 7px 0;
-      font-size: 0.92rem;
-      min-width: 36px;
-      min-height: 36px;
-      width: auto;
-      margin-bottom: 0;
-    }
-    .btn-row {
+    .modal.modal-lg { max-width: 640px; }
+    .modal-handle { width: 40px; height: 5px; border-radius: 3px; background: var(--border-strong); margin: 10px auto 0; flex-shrink: 0; }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px 12px; flex-shrink: 0; }
+    .modal-head h3 { font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+    .modal-head .modal-sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+    .modal-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 20px 16px; overscroll-behavior: contain; }
+    .modal-foot {
       display: flex;
       gap: 8px;
-      margin-top: 12px;
-      flex-wrap: wrap;
-      justify-content: stretch;
+      padding: 12px 20px calc(14px + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .modal-foot .grow { flex: 1; }
+
+    @media (min-width: 640px) {
+      .modal-overlay { align-items: center; padding: 24px; }
+      .modal { border-radius: 26px; border-bottom: 1px solid var(--border-strong); max-height: 88vh; animation: popIn .3s var(--ease); }
+      .modal-handle { display: none; }
+      .modal-foot { border-radius: 0 0 26px 26px; padding-bottom: 16px; }
     }
 
-    /* --- TOP PERF --- */
-    .perf-card {
-      background: #16213e;
-      border-radius: 10px;
-      padding: 16px;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
+    .section-title {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--subtle); margin: 18px 0 10px;
+    }
+
+    /* --- FORMS --- */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-row label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+    .modal input[type=text], .modal input[type=date], .modal input[type=number], .modal select, .search input {
+      width: 100%;
+      height: 46px;
+      padding: 0 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 16px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .modal input:focus, .modal select:focus, .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(200,245,59,0.12); }
+    .modal input::placeholder, .search input::placeholder { color: var(--subtle); }
+    .modal input[type=date] { color-scheme: dark; }
+    .modal select {
+      padding-right: 34px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    .unit-input {
+      display: inline-flex;
       align-items: center;
-      cursor: pointer;
-      transition: border-color 0.2s;
-      border: 2px solid transparent;
-    }
-    .perf-card:hover { border-color: #e94560; }
-    .perf-exo { font-size: 1.1rem; font-weight: 600; }
-    .perf-value { color: #e94560; font-size: 1.2rem; font-weight: 700; }
-    .perf-detail { font-size: 0.8rem; color: #888; margin-top: 4px; }
-
-    /* --- SESSION DETAIL --- */
-    .session-detail-exo { background: #1a1a2e; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-    .session-detail-exo h4 { color: #e94560; margin-bottom: 8px; }
-    .session-detail-exo table { width: 100%; font-size: 0.9rem; }
-    .session-detail-exo th { color: #888; text-align: left; padding: 4px 8px; }
-    .session-detail-exo td { padding: 4px 8px; }
-
-    .empty {
-      text-align: center;
-      color: #888;
-      margin-top: 24px;
-      font-size: 1rem;
-      user-select: none;
-    }
-
-
-
-    /* --- SUPERSET BLOCK --- */
-    .block-wrapper { margin-bottom: 12px; }
-    .block-wrapper.superset {
-      border: 2px dashed #533483;
+      gap: 4px;
+      height: 40px;
+      padding: 0 10px;
+      border: 1px solid var(--border-strong);
       border-radius: 10px;
+      background: var(--bg);
+      color: var(--subtle);
+      font-size: 0.75rem;
+      flex-shrink: 0;
+      transition: border-color .2s;
+    }
+    .unit-input:focus-within { border-color: var(--accent); }
+    .modal .unit-input input[type=number] {
+      width: 38px; height: 100%;
+      padding: 0; border: none; background: transparent; box-shadow: none;
+      text-align: center; font-size: 15px; font-weight: 600; color: var(--text);
+    }
+    .unit-input .ic { width: 14px; height: 14px; }
+
+    /* --- BLOCKS / EXERCISES --- */
+    .block-wrapper { margin-bottom: 10px; }
+    .block-wrapper.superset {
+      border: 1px dashed var(--violet-line);
+      background: var(--violet-soft);
+      border-radius: var(--radius);
       padding: 10px;
-      position: relative;
     }
-    .block-wrapper.superset::before {
-      content: '⚡ SUPERSET';
-      position: absolute;
-      top: -10px;
-      left: 12px;
-      background: #1a1a2e;
-      color: #533483;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0 6px;
+    .block-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+    .block-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--violet);
     }
-    .block-header { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 6px; }
+    .block-tag .ic { width: 14px; height: 14px; fill: currentColor; }
+    .block-header .inline-actions { gap: 6px; }
+
+    .exercise-block {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    .exercise-block:last-child { margin-bottom: 0; }
+    .exo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .modal .exo-header input.exo-name { flex: 1; min-width: 0; font-weight: 600; }
+
+    .sets-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; margin-top: -6px; }
+    .sets-table th { color: var(--subtle); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; padding: 0 4px; }
+    .sets-table th:first-child { width: 40px; }
+    .sets-table th:last-child { width: 40px; }
+    .sets-table td { padding: 0 4px; text-align: center; }
+    .modal .sets-table input[type=number] { height: 40px; text-align: center; font-weight: 600; padding: 0 6px; }
+    .set-idx {
+      display: inline-grid; place-items: center;
+      width: 28px; height: 28px; border-radius: 8px;
+      background: var(--surface-3); color: var(--muted);
+      font-size: 0.8rem; font-weight: 700; font-family: var(--font-display);
+    }
+    .sets-table .icon-btn { width: 32px; height: 32px; background: transparent; border-color: transparent; }
+    .add-set { margin-top: 4px; width: 100%; }
 
     /* --- TEMPLATES --- */
     .tpl-card {
-      background: #16213e; border-radius: 10px; padding: 16px; margin-bottom: 10px;
-      border: 2px solid transparent; transition: border-color 0.2s; cursor: pointer;
+      padding: 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: border-color .2s, transform .12s;
     }
-    .tpl-card:hover { border-color: #533483; }
-    .tpl-card-header { display: flex; justify-content: space-between; align-items: center; }
-    .tpl-card-name { font-size: 1.1rem; font-weight: 600; }
-    .tpl-card-type { color: #533483; font-size: 0.85rem; font-weight: 600; }
-    .tpl-card-sessions { color: #888; font-size: 0.85rem; margin-top: 6px; }
-    .tpl-day-label { display: inline-block; background: #1a1a2e; color: #ccc; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; margin: 2px; }
+    .tpl-card:hover { border-color: var(--border-strong); }
+    .tpl-card:active { transform: scale(0.99); }
+    .tpl-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .tpl-card-name { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; letter-spacing: -0.01em; }
+    .tpl-card-type {
+      font-size: 0.72rem; font-weight: 600; color: var(--violet);
+      background: var(--violet-soft); border: 1px solid var(--violet-line);
+      padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+    }
+    .week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 14px 0 12px; }
+    .week-strip span {
+      height: 30px; border-radius: 8px;
+      display: grid; place-items: center;
+      font-size: 0.72rem; font-weight: 700;
+      background: var(--surface-2); color: var(--subtle);
+    }
+    .week-strip span.on { background: var(--accent); color: var(--accent-ink); }
+    .tpl-card-sessions { display: flex; flex-wrap: wrap; gap: 6px; color: var(--subtle); font-size: 0.85rem; }
+    .tpl-day-label {
+      display: inline-flex; gap: 6px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text); font-size: 0.78rem;
+      padding: 4px 10px; border-radius: 8px;
+    }
+    .tpl-day-label b { color: var(--muted); font-weight: 600; }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
+    .tpl-session {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .tpl-session-head { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .tpl-blocks .block-wrapper:not(.superset) { margin-bottom: 6px; }
+    .tpl-exo-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+    .modal .tpl-exo-row input.tpl-exo-name { flex: 1 1 140px; min-width: 0; height: 40px; }
+    @media (max-width: 520px) {
+      .tpl-exo-row { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+      .tpl-exo-row:last-child { border-bottom: none; padding-bottom: 0; }
+      .modal .tpl-exo-row input.tpl-exo-name { flex-basis: 100%; }
+      .tpl-exo-row .icon-btn { margin-left: auto; }
+    }
+
+    /* --- TOP PERF --- */
+    .search { position: relative; display: block; margin-bottom: 14px; }
+    .search .ic { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--subtle); width: 18px; height: 18px; }
+    .search input { padding-left: 42px; background: var(--surface); }
+    .perf-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color .2s, transform .12s;
+    }
+    .perf-card:hover { border-color: var(--accent-line); }
+    .perf-card:active { transform: scale(0.99); }
+    .perf-avatar {
+      width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, rgba(200,245,59,0.22), rgba(167,139,250,0.18));
+      border: 1px solid var(--border-strong);
+      font-family: var(--font-display); font-weight: 700; font-size: 1.1rem;
+    }
+    .perf-info { flex: 1; min-width: 0; }
+    .perf-exo { font-weight: 600; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .perf-detail { font-size: 0.78rem; color: var(--subtle); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .perf-value { text-align: right; flex-shrink: 0; }
+    .perf-weight { font-family: var(--font-display); font-size: 1.45rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; line-height: 1; }
+    .perf-weight small { font-size: 0.8rem; font-weight: 600; margin-left: 2px; }
+    .perf-reps { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+    .perf-1rm { color: var(--subtle); }
+
+    /* --- SESSION DETAIL --- */
+    .detail-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    .detail-stats .stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+    .detail-stats .stat-value { font-size: 1.2rem; }
+    .session-detail-exo { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 8px; }
+    .block-wrapper.superset .session-detail-exo:last-child { margin-bottom: 0; }
+    .session-detail-exo h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 1rem; margin-bottom: 8px; }
+    .rest-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 600; color: var(--muted); background: var(--surface-3); padding: 3px 8px; border-radius: 999px; }
+    .rest-pill .ic { width: 12px; height: 12px; }
+    .session-detail-exo table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .session-detail-exo th { color: var(--subtle); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 6px 4px; }
+    .session-detail-exo td { padding: 8px 4px; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+    .session-detail-exo td:last-child { font-weight: 600; }
+
+    /* --- EMPTY --- */
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 20px;
+      font-size: 0.95rem;
+      user-select: none;
+    }
+    .empty::before {
+      content: '';
+      display: block;
+      width: 56px; height: 56px;
+      margin: 0 auto 14px;
+      border-radius: 18px;
+      background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E") no-repeat center;
+      border: 1px dashed var(--border-strong);
+    }
+
+    /* --- TOASTS --- */
+    .toast-stack {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(var(--tabbar-h) + 28px + env(safe-area-inset-bottom));
+      z-index: 400; display: flex; flex-direction: column; gap: 8px; align-items: center;
+      pointer-events: none; width: calc(100% - 32px); max-width: 420px;
+    }
+    .toast {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; border-radius: 14px;
+      background: #f4f4f5; color: #09090b;
+      font-size: 0.9rem; font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      animation: toastIn .3s var(--ease);
+    }
+    .toast .ic { color: #4d7c0f; }
+    .toast.error { background: var(--danger); color: #1a0508; }
+    .toast.error .ic { color: inherit; }
+    .toast.out { opacity: 0; transform: translateY(8px); transition: all .25s; }
+
+    /* --- ANIMATIONS --- */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    @keyframes popIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+    @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+
+    @media (max-width: 380px) {
+      .tpl-session-head { grid-template-columns: 1fr auto; }
+      .tpl-session-head .tpl-session-name { grid-column: 1 / -1; grid-row: 2; }
+      .page-head h1 { font-size: 1.7rem; }
+      .stat-value { font-size: 1.25rem; }
     }
   </style>
 </head>
 <body>
 
-  <!-- NAVIGATION -->
-  <div class="nav">
-    <button class="active" data-page="calendar">📅 Séances</button>
-    <button data-page="templates">📋 Semaines</button>
-    <button data-page="topperf">🏆 Perf</button>
-  </div>
+  <!-- ICONS -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7l10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><path d="M10 2h4"/><path d="m12 14 3-3"/><circle cx="12" cy="14" r="8"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 24 24"><path d="M5 17V7l7 5 7-5v10"/></symbol>
+  </svg>
+
+  <!-- APP BAR -->
+  <header class="appbar">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+      <div>Mogg<span>Track</span></div>
+    </div>
+    <div class="appbar-date" id="todayLabel"></div>
+  </header>
 
   <!-- PAGE: CALENDRIER -->
-  <div class="page active" id="page-calendar">
-    <h2>Mes Séances</h2>
-    <div class="week-nav">
-      <button id="prevWeek">◀</button>
-      <span id="weekLabel"></span>
-      <button id="nextWeek">▶</button>
+  <main class="page active" id="page-calendar">
+    <div class="page-head">
+      <p class="eyebrow">Planning</p>
+      <h1>Mes séances</h1>
     </div>
-    <div class="week-grid">
-      <div class="day-header">Lun</div><div class="day-header">Mar</div><div class="day-header">Mer</div>
-      <div class="day-header">Jeu</div><div class="day-header">Ven</div><div class="day-header">Sam</div><div class="day-header">Dim</div>
+
+    <div class="week-nav card">
+      <button class="icon-btn lg" id="prevWeek" aria-label="Semaine précédente"><svg class="ic"><use href="#i-left"/></svg></button>
+      <div class="week-nav-center">
+        <span class="week-kicker" id="weekKicker"></span>
+        <span id="weekLabel"></span>
+      </div>
+      <button class="icon-btn lg" id="nextWeek" aria-label="Semaine suivante"><svg class="ic"><use href="#i-right"/></svg></button>
+    </div>
+    <button class="today-link" id="todayBtn" hidden>← Revenir à cette semaine</button>
+
+    <div class="stats">
+      <div class="stat card"><div class="stat-label">Séances</div><div class="stat-value" id="statSessions">0</div></div>
+      <div class="stat card"><div class="stat-label">Séries</div><div class="stat-value" id="statSets">0</div></div>
+      <div class="stat card"><div class="stat-label">Volume</div><div class="stat-value" id="statVolume">0</div></div>
+    </div>
+
+    <div class="week-list">
       <div class="day-cell" id="d0"></div><div class="day-cell" id="d1"></div><div class="day-cell" id="d2"></div>
       <div class="day-cell" id="d3"></div><div class="day-cell" id="d4"></div><div class="day-cell" id="d5"></div><div class="day-cell" id="d6"></div>
     </div>
-    <div style="text-align:center;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-      <button class="btn btn-primary" id="addSessionBtn">+ Nouvelle Séance</button>
-      <button class="btn btn-secondary" id="applyTplBtn">📋 Appliquer un template</button>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="addSessionBtn"><svg class="ic"><use href="#i-plus"/></svg>Séance</button>
+      <button class="btn btn-secondary" id="applyTplBtn"><svg class="ic"><use href="#i-copy"/></svg>Template</button>
     </div>
-  </div>
+  </main>
 
   <!-- PAGE: TEMPLATES -->
-  <div class="page" id="page-templates">
-    <h2>📋 Mes Semaines Types</h2>
-    <div id="tplList"></div>
-    <p class="empty" id="tplEmpty">Aucun template. Crée ta semaine type !</p>
-    <div style="text-align:center;margin-top:16px;">
-      <button class="btn btn-primary" id="addTplBtn">+ Nouveau Template</button>
+  <main class="page" id="page-templates">
+    <div class="page-head">
+      <p class="eyebrow">Programmation</p>
+      <h1>Semaines types</h1>
+      <p class="sub">Crée tes semaines modèles et applique-les en un geste.</p>
     </div>
-  </div>
+    <div id="tplList"></div>
+    <p class="empty" id="tplEmpty">Aucun template pour l'instant.<br>Crée ta première semaine type !</p>
+    <button class="btn btn-primary btn-block" id="addTplBtn" style="margin-top:8px;"><svg class="ic"><use href="#i-plus"/></svg>Nouveau template</button>
+  </main>
 
   <!-- PAGE: TOP PERF -->
-  <div class="page" id="page-topperf">
-    <h2>🏆 Meilleures Performances</h2>
+  <main class="page" id="page-topperf">
+    <div class="page-head">
+      <p class="eyebrow">Records</p>
+      <h1>Meilleures perfs</h1>
+    </div>
+    <label class="search">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <input type="text" id="perfSearch" placeholder="Rechercher un exercice…" autocomplete="off">
+    </label>
     <div id="perfList"></div>
-    <p class="empty" id="perfEmpty">Aucune perf enregistrée. Ajoute des séances !</p>
-  </div>
+    <p class="empty" id="perfEmpty">Aucune perf enregistrée.<br>Ajoute des séances pour voir tes records.</p>
+  </main>
+
+  <!-- TAB BAR -->
+  <nav class="tabbar nav">
+    <button class="active" data-page="calendar"><svg class="ic"><use href="#i-calendar"/></svg>Séances</button>
+    <button data-page="templates"><svg class="ic"><use href="#i-layers"/></svg>Semaines</button>
+    <button data-page="topperf"><svg class="ic"><use href="#i-trophy"/></svg>Perfs</button>
+  </nav>
+
+  <div class="toast-stack" id="toasts"></div>
 
   <!-- MODAL: Créer/Éditer séance -->
   <div class="modal-overlay" id="sessionModal">
     <div class="modal">
-      <h3 id="modalTitle">Nouvelle Séance</h3>
-      <div class="form-row">
-        <label>Date</label>
-        <input type="date" id="sessionDate">
+      <div class="modal-handle"></div>
+      <div class="modal-head">
+        <h3 id="modalTitle">Nouvelle séance</h3>
+        <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
-      <div class="form-row">
-        <label>Nom de la séance</label>
-        <input type="text" id="sessionName" placeholder="Ex: Push, Pull, Legs..." maxlength="200">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="sessionDate">Date</label>
+            <input type="date" id="sessionDate">
+          </div>
+          <div class="form-row">
+            <label for="sessionName">Nom</label>
+            <input type="text" id="sessionName" placeholder="Push, Pull, Legs…" maxlength="200">
+          </div>
+        </div>
+        <div class="section-title">Exercices</div>
+        <div id="blockList"></div>
+        <div class="inline-actions" style="margin-top:4px;">
+          <button class="btn btn-ghost btn-sm" id="addSingleBtn" style="flex:1;"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Exercice</button>
+          <button class="btn btn-violet btn-sm" id="addSupersetBtn" style="flex:1;"><svg class="ic ic-sm"><use href="#i-zap"/></svg>Superset</button>
+        </div>
       </div>
-      <h4 style="color:#aaa;margin:16px 0 8px;">Blocs d'exercices</h4>
-      <div id="blockList"></div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" id="addSingleBtn">+ Exercice</button>
-        <button class="btn btn-secondary btn-sm" id="addSupersetBtn">⚡ + Superset</button>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-primary" id="saveSessionBtn">Sauvegarder</button>
-        <button class="btn btn-danger" id="deleteSessionBtn" style="display:none;">Supprimer</button>
+      <div class="modal-foot">
+        <button class="icon-btn lg danger" id="deleteSessionBtn" aria-label="Supprimer" hidden><svg class="ic"><use href="#i-trash"/></svg></button>
         <button class="btn btn-secondary" id="closeModalBtn">Annuler</button>
+        <button class="btn btn-primary grow" id="saveSessionBtn"><svg class="ic"><use href="#i-check"/></svg>Sauvegarder</button>
       </div>
     </div>
   </div>
 
   <!-- MODAL: Détail séance (depuis Top Perf) -->
-  <div class="modal-overlay" id="detailModal">
+  <div class="modal-overlay" id="detailModal" data-dismiss>
     <div class="modal">
-      <h3 id="detailTitle"></h3>
-      <p id="detailDate" style="color:#888;margin-bottom:16px;"></p>
-      <div id="detailExercises"></div>
-      <div class="btn-row">
-        <button class="btn btn-secondary" id="closeDetailBtn">Fermer</button>
+      <div class="modal-handle"></div>
+      <div class="modal-head">
+        <div>
+          <h3 id="detailTitle"></h3>
+          <p class="modal-sub"><svg class="ic ic-sm"><use href="#i-calendar"/></svg><span id="detailDate"></span></p>
+        </div>
+        <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-stats" id="detailStats"></div>
+        <div id="detailExercises"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary grow" id="closeDetailBtn">Fermer</button>
       </div>
     </div>
   </div>
 
   <!-- MODAL: Appliquer template -->
-  <div class="modal-overlay" id="applyTplModal">
+  <div class="modal-overlay" id="applyTplModal" data-dismiss>
     <div class="modal">
-      <h3>Appliquer un template à cette semaine</h3>
-      <div id="applyTplList" style="margin:16px 0;"></div>
-      <p class="empty" id="applyTplEmpty">Aucun template disponible</p>
-      <div class="btn-row">
-        <button class="btn btn-secondary" id="closeApplyTplBtn">Annuler</button>
+      <div class="modal-handle"></div>
+      <div class="modal-head">
+        <div>
+          <h3>Appliquer un template</h3>
+          <p class="modal-sub" id="applyTplWeek"></p>
+        </div>
+        <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <div id="applyTplList"></div>
+        <p class="empty" id="applyTplEmpty">Aucun template disponible</p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary grow" id="closeApplyTplBtn">Annuler</button>
       </div>
     </div>
   </div>
 
   <!-- MODAL: Créer/Éditer template -->
   <div class="modal-overlay" id="tplModal">
-    <div class="modal" style="max-width:600px;">
-      <h3 id="tplModalTitle">Nouveau Template</h3>
-      <div class="form-row">
-        <label>Nom du template</label>
-        <input type="text" id="tplName" placeholder="Ex: Semaine Force" maxlength="200">
+    <div class="modal modal-lg">
+      <div class="modal-handle"></div>
+      <div class="modal-head">
+        <h3 id="tplModalTitle">Nouveau template</h3>
+        <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
-      <div class="form-row">
-        <label>Type de semaine</label>
-        <input type="text" id="tplWeekType" placeholder="Ex: Force, Volume, Puissance..." maxlength="100">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="tplName">Nom du template</label>
+            <input type="text" id="tplName" placeholder="Semaine Force" maxlength="200">
+          </div>
+          <div class="form-row">
+            <label for="tplWeekType">Type de semaine</label>
+            <input type="text" id="tplWeekType" placeholder="Force, Volume…" maxlength="100">
+          </div>
+        </div>
+        <div class="section-title">Séances de la semaine</div>
+        <div id="tplSessionList"></div>
+        <button class="btn btn-ghost btn-sm btn-block" id="addTplSessionBtn"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Ajouter une séance</button>
       </div>
-      <h4 style="color:#aaa;margin:16px 0 8px;">Séances de la semaine</h4>
-      <div id="tplSessionList"></div>
-      <button class="btn btn-secondary btn-sm" id="addTplSessionBtn" style="margin-bottom:12px;">+ Séance</button>
-      <div class="btn-row">
-        <button class="btn btn-primary" id="saveTplBtn">Sauvegarder</button>
-        <button class="btn btn-danger" id="deleteTplBtn" style="display:none;">Supprimer</button>
+      <div class="modal-foot">
+        <button class="icon-btn lg danger" id="deleteTplBtn" aria-label="Supprimer" hidden><svg class="ic"><use href="#i-trash"/></svg></button>
         <button class="btn btn-secondary" id="closeTplModalBtn">Annuler</button>
+        <button class="btn btn-primary grow" id="saveTplBtn"><svg class="ic"><use href="#i-check"/></svg>Sauvegarder</button>
       </div>
     </div>
   </div>
@@ -422,24 +786,16 @@
     // --- STATE ---
     let sessions = [];
     let templates = [];
+    let perfs = [];
     let currentWeekStart = getMonday(new Date());
     let editingSessionId = null;
     let editingTplId = null;
     const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
-
-    // --- NAV ---
-    document.querySelectorAll('.nav button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById('page-' + btn.dataset.page).classList.add('active');
-        if (btn.dataset.page === 'topperf') loadPerfs();
-        if (btn.dataset.page === 'templates') loadTemplates();
-      });
-    });
+    const DAYS_SHORT = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    const DAYS_LETTER = ['L','M','M','J','V','S','D'];
 
     // --- UTILS ---
+    function icon(name, cls) { return `<svg class="ic ${cls||''}"><use href="#i-${name}"/></svg>`; }
     function getMonday(d) {
       const date = new Date(d);
       const day = date.getDay();
@@ -448,91 +804,183 @@
       date.setHours(0,0,0,0);
       return date;
     }
+    function getWeekNumber(d) {
+      const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dayNum = t.getUTCDay() || 7;
+      t.setUTCDate(t.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+      return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+    }
     function formatDate(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
     function frDate(str) { const [y,m,d]=str.split('-'); return `${d}/${m}/${y}`; }
+    function frLongDate(str) {
+      const [y,m,d] = str.split('-').map(Number);
+      return new Date(y, m-1, d).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    }
     function frDateRange(start) {
       const end = new Date(start); end.setDate(end.getDate()+6);
       const opts = { day:'numeric', month:'short' };
       return `${start.toLocaleDateString('fr-FR',opts)} — ${end.toLocaleDateString('fr-FR',opts)} ${end.getFullYear()}`;
     }
-    function escapeHtml(str) { const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+    function sessionStats(s) {
+      let exos = 0, sets = 0, volume = 0;
+      (s.blocks||[]).forEach(b => (b.exercises||[]).forEach(ex => {
+        exos++;
+        (ex.sets||[]).forEach(set => { sets++; volume += num(set.reps) * num(set.weight); });
+      }));
+      return { exos, sets, volume };
+    }
+    function formatVolume(v) {
+      if (v >= 1000) return `${(v/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})}<small>t</small>`;
+      return `${Math.round(v).toLocaleString('fr-FR')}<small>kg</small>`;
+    }
+    function toast(msg, type) {
+      const el = document.createElement('div');
+      el.className = 'toast' + (type==='error' ? ' error' : '');
+      el.innerHTML = icon(type==='error' ? 'alert' : 'check') + `<span>${escapeHtml(msg)}</span>`;
+      document.getElementById('toasts').appendChild(el);
+      setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, 2400);
+    }
+
+    // --- MODALS ---
+    function openModal(id) {
+      document.getElementById(id).classList.add('open');
+      document.body.classList.add('modal-open');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+      if (!document.querySelector('.modal-overlay.open')) document.body.classList.remove('modal-open');
+    }
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeModal(overlay.id));
+      if (overlay.hasAttribute('data-dismiss')) {
+        overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay.id); });
+      }
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      const open = [...document.querySelectorAll('.modal-overlay.open')].pop();
+      if (open) closeModal(open.id);
+    });
+
+    // --- NAV ---
+    document.querySelectorAll('.nav button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page-' + btn.dataset.page).classList.add('active');
+        window.scrollTo({ top: 0 });
+        if (btn.dataset.page === 'topperf') loadPerfs();
+        if (btn.dataset.page === 'templates') loadTemplates();
+      });
+    });
+
+    document.getElementById('todayLabel').textContent =
+      new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
 
     // --- CALENDAR ---
     function renderWeek() {
       document.getElementById('weekLabel').textContent = frDateRange(currentWeekStart);
+      const isCurrent = formatDate(currentWeekStart) === formatDate(getMonday(new Date()));
+      document.getElementById('weekKicker').textContent = (isCurrent ? 'Cette semaine · ' : '') + 'Semaine ' + getWeekNumber(currentWeekStart);
+      document.getElementById('todayBtn').hidden = isCurrent;
+
       const today = formatDate(new Date());
+      let totalSessions = 0, totalSets = 0, totalVolume = 0;
       for (let i=0;i<7;i++) {
         const cell = document.getElementById('d'+i);
         const d = new Date(currentWeekStart);
         d.setDate(d.getDate()+i);
         const dateStr = formatDate(d);
-        cell.className = 'day-cell' + (dateStr===today?' today':'');
-        cell.dataset.date = dateStr;
         const daySessions = sessions.filter(s=>s.date===dateStr);
-        cell.innerHTML = `<div class="day-num">${d.getDate()}</div>`;
-        daySessions.forEach(s => {
-          cell.innerHTML += `<div class="session-dot" data-id="${s.id}">${escapeHtml(s.name)}</div>`;
-        });
+        cell.className = 'day-cell' + (dateStr===today?' today':'') + (dateStr<today?' past':'');
+        cell.dataset.date = dateStr;
+        const chips = daySessions.map(s => {
+          const st = sessionStats(s);
+          totalSessions++; totalSets += st.sets; totalVolume += st.volume;
+          return `<div class="session-dot" data-id="${escapeHtml(s.id)}">
+            <span class="s-name">${escapeHtml(s.name)}</span>
+            <span class="s-meta">${st.exos} exo${st.exos>1?'s':''} · ${st.sets} séries</span>
+          </div>`;
+        }).join('');
+        cell.innerHTML = `
+          <div class="day-meta"><span class="day-name">${DAYS_SHORT[i]}</span><span class="day-num">${d.getDate()}</span></div>
+          <div class="day-body">${chips || `<span class="day-empty">${icon('plus')}Repos · ajouter une séance</span>`}</div>`;
         cell.onclick = (e) => {
           const dot = e.target.closest('.session-dot');
           if (dot) openEditSession(dot.dataset.id);
           else openNewSession(dateStr);
         };
       }
+      document.getElementById('statSessions').textContent = totalSessions;
+      document.getElementById('statSets').textContent = totalSets;
+      document.getElementById('statVolume').innerHTML = formatVolume(totalVolume);
     }
     document.getElementById('prevWeek').onclick = () => { currentWeekStart.setDate(currentWeekStart.getDate()-7); renderWeek(); };
     document.getElementById('nextWeek').onclick = () => { currentWeekStart.setDate(currentWeekStart.getDate()+7); renderWeek(); };
+    document.getElementById('todayBtn').onclick = () => { currentWeekStart = getMonday(new Date()); renderWeek(); };
 
     // ===========================================
     // SESSION MODAL (with blocks: single/superset)
     // ===========================================
     function openNewSession(date) {
       editingSessionId = null;
-      document.getElementById('modalTitle').textContent = 'Nouvelle Séance';
+      document.getElementById('modalTitle').textContent = 'Nouvelle séance';
       document.getElementById('sessionDate').value = date || formatDate(new Date());
       document.getElementById('sessionName').value = '';
       document.getElementById('blockList').innerHTML = '';
-      document.getElementById('deleteSessionBtn').style.display = 'none';
+      document.getElementById('deleteSessionBtn').hidden = true;
       addBlockUI('single');
-      document.getElementById('sessionModal').classList.add('open');
+      openModal('sessionModal');
     }
     function openEditSession(id) {
       const session = sessions.find(s=>s.id===id);
       if (!session) return;
       editingSessionId = id;
-      document.getElementById('modalTitle').textContent = 'Modifier la Séance';
+      document.getElementById('modalTitle').textContent = 'Modifier la séance';
       document.getElementById('sessionDate').value = session.date;
       document.getElementById('sessionName').value = session.name;
       document.getElementById('blockList').innerHTML = '';
-      document.getElementById('deleteSessionBtn').style.display = 'inline-block';
+      document.getElementById('deleteSessionBtn').hidden = false;
       (session.blocks||[]).forEach(b => addBlockUI(b.type, b.exercises));
-      document.getElementById('sessionModal').classList.add('open');
+      openModal('sessionModal');
     }
     document.getElementById('addSessionBtn').onclick = () => openNewSession();
-    document.getElementById('closeModalBtn').onclick = () => document.getElementById('sessionModal').classList.remove('open');
+    document.getElementById('closeModalBtn').onclick = () => closeModal('sessionModal');
     document.getElementById('addSingleBtn').onclick = () => addBlockUI('single');
     document.getElementById('addSupersetBtn').onclick = () => addBlockUI('superset');
 
-    function addBlockUI(type, exercises) {
+    // Builds a block wrapper; supersets get a header with a tag and actions
+    function createBlockWrapper(type, onAddExo) {
       const wrapper = document.createElement('div');
       wrapper.className = 'block-wrapper ' + type;
       wrapper.dataset.type = type;
-      const header = document.createElement('div');
-      header.className = 'block-header';
       if (type === 'superset') {
-        const addExoBtn = document.createElement('button');
-        addExoBtn.className = 'btn btn-secondary btn-sm';
-        addExoBtn.textContent = '+ Exo au superset';
-        addExoBtn.onclick = () => addExoToBlock(wrapper);
-        header.appendChild(addExoBtn);
+        const header = document.createElement('div');
+        header.className = 'block-header';
+        header.innerHTML = `<span class="block-tag">${icon('zap')}Superset</span>
+          <div class="inline-actions">
+            <button class="btn btn-violet btn-sm add-exo">${icon('plus','ic-sm')}Exo</button>
+            <button class="icon-btn danger remove-block" aria-label="Supprimer le superset">${icon('trash','ic-sm')}</button>
+          </div>`;
+        header.querySelector('.add-exo').onclick = onAddExo;
+        header.querySelector('.remove-block').onclick = () => wrapper.remove();
+        wrapper.appendChild(header);
       }
-      const removeBlockBtn = document.createElement('button');
-      removeBlockBtn.className = 'btn btn-danger btn-sm';
-      removeBlockBtn.textContent = '✕ Bloc';
-      removeBlockBtn.onclick = () => wrapper.remove();
-      header.appendChild(removeBlockBtn);
-      wrapper.appendChild(header);
+      return wrapper;
+    }
+    function removeExoFrom(el, container) {
+      el.remove();
+      if (!container.children.length) container.closest('.block-wrapper').remove();
+    }
 
+    function addBlockUI(type, exercises) {
+      const wrapper = createBlockWrapper(type, () => addExoToBlock(wrapper));
       const exoContainer = document.createElement('div');
       exoContainer.className = 'exo-container';
       wrapper.appendChild(exoContainer);
@@ -546,6 +994,13 @@
       document.getElementById('blockList').appendChild(wrapper);
     }
 
+    function setRowHTML(i, s) {
+      return `<td><span class="set-idx">${i}</span></td>
+        <td><input type="number" class="set-reps" inputmode="numeric" value="${s?escapeHtml(s.reps):''}" min="0" max="9999" placeholder="0"></td>
+        <td><input type="number" class="set-weight" inputmode="decimal" value="${s?escapeHtml(s.weight):''}" min="0" max="9999" step="0.5" placeholder="0"></td>
+        <td><button class="icon-btn danger remove-set" aria-label="Supprimer la série">${icon('x','ic-sm')}</button></td>`;
+    }
+
     function addExoToBlock(wrapper, ex) {
       const container = wrapper.querySelector('.exo-container');
       const div = document.createElement('div');
@@ -554,24 +1009,22 @@
       div.innerHTML = `
         <div class="exo-header">
           <input type="text" class="exo-name" placeholder="Nom de l'exercice" value="${ex?escapeHtml(ex.name):''}" maxlength="200">
-          <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
-            <span style="font-size:0.75rem;">⏱</span>
-            <input type="number" class="exo-rest" placeholder="-" value="${ex&&ex.rest?ex.rest:''}" min="0" max="3600" style="width:50px;padding:5px;text-align:center;border:2px solid #16213e;border-radius:6px;background:#16213e;color:#eee;font-size:0.8rem;outline:none;">
-            <span style="color:#888;font-size:0.7rem;">s</span>
-          </div>
-          <button class="btn btn-danger btn-sm remove-exo">✕</button>
+          <label class="unit-input" title="Repos">${icon('timer')}<input type="number" class="exo-rest" inputmode="numeric" placeholder="–" value="${ex&&ex.rest?escapeHtml(ex.rest):''}" min="0" max="3600"><span>s</span></label>
+          <button class="icon-btn danger remove-exo" aria-label="Supprimer l'exercice">${icon('trash','ic-sm')}</button>
         </div>
         <table class="sets-table">
-          <thead><tr><th>Série</th><th>Reps</th><th>Poids (kg)</th><th></th></tr></thead>
-          <tbody>${sets.map((s,i)=>`<tr><td>${i+1}</td><td><input type="number" class="set-reps" value="${s.reps}" min="0" max="9999"></td><td><input type="number" class="set-weight" value="${s.weight}" min="0" max="9999" step="0.5"></td><td><button class="btn btn-danger btn-sm remove-set">✕</button></td></tr>`).join('')}</tbody>
+          <thead><tr><th>#</th><th>Reps</th><th>Kg</th><th></th></tr></thead>
+          <tbody>${sets.map((s,i)=>`<tr>${setRowHTML(i+1, s)}</tr>`).join('')}</tbody>
         </table>
-        <button class="btn btn-secondary btn-sm add-set" style="margin-top:6px;">+ Série</button>
+        <button class="btn btn-ghost btn-sm add-set">${icon('plus','ic-sm')}Série</button>
       `;
-      div.querySelector('.remove-exo').onclick = () => div.remove();
+      div.querySelector('.remove-exo').onclick = () => removeExoFrom(div, container);
       div.querySelector('.add-set').onclick = () => {
         const tbody=div.querySelector('tbody'); const idx=tbody.rows.length+1;
+        const last = tbody.rows[tbody.rows.length-1];
+        const prev = last ? { reps: last.querySelector('.set-reps').value, weight: last.querySelector('.set-weight').value } : null;
         const tr=document.createElement('tr');
-        tr.innerHTML=`<td>${idx}</td><td><input type="number" class="set-reps" min="0" max="9999"></td><td><input type="number" class="set-weight" min="0" max="9999" step="0.5"></td><td><button class="btn btn-danger btn-sm remove-set">✕</button></td>`;
+        tr.innerHTML=setRowHTML(idx, prev);
         tr.querySelector('.remove-set').onclick=()=>{tr.remove();renumberSets(div);};
         tbody.appendChild(tr);
       };
@@ -580,13 +1033,13 @@
     }
 
     function renumberSets(div) {
-      div.querySelectorAll('tbody tr').forEach((tr,i)=>{tr.cells[0].textContent=i+1;});
+      div.querySelectorAll('tbody tr').forEach((tr,i)=>{tr.querySelector('.set-idx').textContent=i+1;});
     }
 
     document.getElementById('saveSessionBtn').onclick = async () => {
       const date = document.getElementById('sessionDate').value;
       const name = document.getElementById('sessionName').value.trim();
-      if (!date||!name) return alert('Remplis la date et le nom');
+      if (!date||!name) return toast('Remplis la date et le nom', 'error');
       const blocks = [];
       document.querySelectorAll('#blockList .block-wrapper').forEach(wrapper => {
         const type = wrapper.dataset.type;
@@ -611,14 +1064,16 @@
       } else {
         await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       }
-      document.getElementById('sessionModal').classList.remove('open');
+      closeModal('sessionModal');
+      toast('Séance enregistrée');
       await loadSessions();
     };
 
     document.getElementById('deleteSessionBtn').onclick = async () => {
       if (!editingSessionId||!confirm('Supprimer cette séance ?')) return;
       await fetch('/api/sessions/'+editingSessionId,{method:'DELETE'});
-      document.getElementById('sessionModal').classList.remove('open');
+      closeModal('sessionModal');
+      toast('Séance supprimée');
       await loadSessions();
     };
 
@@ -631,6 +1086,20 @@
       renderTemplates();
     }
 
+    function templateCardHTML(tpl) {
+      const days = new Set(tpl.sessions.map(s=>s.dayOfWeek));
+      const strip = DAYS_LETTER.map((l,i)=>`<span class="${days.has(i+1)?'on':''}">${l}</span>`).join('');
+      const sessionsInfo = [...tpl.sessions].sort((a,b)=>a.dayOfWeek-b.dayOfWeek)
+        .map(s=>`<span class="tpl-day-label"><b>${DAYS_SHORT[s.dayOfWeek-1]}</b>${escapeHtml(s.name)}</span>`).join('');
+      return `
+        <div class="tpl-card-header">
+          <span class="tpl-card-name">${escapeHtml(tpl.name)}</span>
+          ${tpl.weekType ? `<span class="tpl-card-type">${escapeHtml(tpl.weekType)}</span>` : ''}
+        </div>
+        <div class="week-strip">${strip}</div>
+        <div class="tpl-card-sessions">${sessionsInfo||'Aucune séance'}</div>`;
+    }
+
     function renderTemplates() {
       const list = document.getElementById('tplList');
       const empty = document.getElementById('tplEmpty');
@@ -638,63 +1107,56 @@
       empty.style.display = templates.length===0?'block':'none';
       templates.forEach(tpl => {
         const div = document.createElement('div');
-        div.className = 'tpl-card';
-        const sessionsInfo = tpl.sessions.map(s=>`<span class="tpl-day-label">${DAYS[s.dayOfWeek-1]}: ${escapeHtml(s.name)}</span>`).join(' ');
-        div.innerHTML = `
-          <div class="tpl-card-header">
-            <span class="tpl-card-name">${escapeHtml(tpl.name)}</span>
-            <span class="tpl-card-type">${escapeHtml(tpl.weekType||'')}</span>
-          </div>
-          <div class="tpl-card-sessions">${sessionsInfo||'Aucune séance'}</div>
-        `;
+        div.className = 'tpl-card card';
+        div.innerHTML = templateCardHTML(tpl);
         div.onclick = () => openEditTemplate(tpl.id);
         list.appendChild(div);
       });
     }
 
     document.getElementById('addTplBtn').onclick = () => openNewTemplate();
-    document.getElementById('closeTplModalBtn').onclick = () => document.getElementById('tplModal').classList.remove('open');
+    document.getElementById('closeTplModalBtn').onclick = () => closeModal('tplModal');
 
     function openNewTemplate() {
       editingTplId = null;
-      document.getElementById('tplModalTitle').textContent = 'Nouveau Template';
+      document.getElementById('tplModalTitle').textContent = 'Nouveau template';
       document.getElementById('tplName').value = '';
       document.getElementById('tplWeekType').value = '';
       document.getElementById('tplSessionList').innerHTML = '';
-      document.getElementById('deleteTplBtn').style.display = 'none';
+      document.getElementById('deleteTplBtn').hidden = true;
       addTplSessionUI();
-      document.getElementById('tplModal').classList.add('open');
+      openModal('tplModal');
     }
 
     function openEditTemplate(id) {
       const tpl = templates.find(t=>t.id===id);
       if (!tpl) return;
       editingTplId = id;
-      document.getElementById('tplModalTitle').textContent = 'Modifier le Template';
+      document.getElementById('tplModalTitle').textContent = 'Modifier le template';
       document.getElementById('tplName').value = tpl.name;
       document.getElementById('tplWeekType').value = tpl.weekType||'';
       document.getElementById('tplSessionList').innerHTML = '';
-      document.getElementById('deleteTplBtn').style.display = 'inline-block';
+      document.getElementById('deleteTplBtn').hidden = false;
       tpl.sessions.forEach(s => addTplSessionUI(s));
-      document.getElementById('tplModal').classList.add('open');
+      openModal('tplModal');
     }
 
     document.getElementById('addTplSessionBtn').onclick = () => addTplSessionUI();
 
     function addTplSessionUI(s) {
       const div = document.createElement('div');
-      div.style.cssText = 'background:#1a1a2e;border-radius:8px;padding:12px;margin-bottom:10px;';
+      div.className = 'tpl-session';
       const dayOptions = DAYS.map((d,i)=>`<option value="${i+1}" ${s&&s.dayOfWeek===i+1?'selected':''}>${d}</option>`).join('');
       div.innerHTML = `
-        <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
-          <select class="tpl-day" style="padding:8px;border-radius:8px;background:#16213e;color:#eee;border:2px solid #16213e;font-size:0.9rem;">${dayOptions}</select>
-          <input type="text" class="tpl-session-name" placeholder="Nom (Push, Pull...)" value="${s?escapeHtml(s.name):''}" maxlength="200" style="flex:1;min-width:120px;padding:8px 10px;border:2px solid #16213e;border-radius:8px;background:#16213e;color:#eee;font-size:0.9rem;outline:none;">
-          <button class="btn btn-danger btn-sm remove-tpl-session">✕</button>
+        <div class="tpl-session-head">
+          <select class="tpl-day">${dayOptions}</select>
+          <input type="text" class="tpl-session-name" placeholder="Push, Pull…" value="${s?escapeHtml(s.name):''}" maxlength="200">
+          <button class="icon-btn lg danger remove-tpl-session" aria-label="Supprimer la séance">${icon('trash','ic-sm')}</button>
         </div>
         <div class="tpl-blocks"></div>
-        <div style="display:flex;gap:6px;margin-top:6px;">
-          <button class="btn btn-secondary btn-sm add-tpl-single">+ Exercice</button>
-          <button class="btn btn-secondary btn-sm add-tpl-superset">⚡ + Superset</button>
+        <div class="inline-actions" style="margin-top:4px;">
+          <button class="btn btn-ghost btn-sm add-tpl-single" style="flex:1;">${icon('plus','ic-sm')}Exercice</button>
+          <button class="btn btn-violet btn-sm add-tpl-superset" style="flex:1;">${icon('zap','ic-sm')}Superset</button>
         </div>
       `;
       div.querySelector('.remove-tpl-session').onclick = () => div.remove();
@@ -712,26 +1174,7 @@
     }
 
     function addTplBlockUI(container, type, exercises) {
-      const bDiv = document.createElement('div');
-      bDiv.className = 'block-wrapper ' + type;
-      bDiv.dataset.type = type;
-      bDiv.style.marginBottom = '8px';
-      const bHeader = document.createElement('div');
-      bHeader.className = 'block-header';
-      if (type==='superset') {
-        const addBtn = document.createElement('button');
-        addBtn.className='btn btn-secondary btn-sm';
-        addBtn.textContent='+ Exo';
-        addBtn.onclick=()=>addTplExoUI(bDiv.querySelector('.tpl-exo-container'));
-        bHeader.appendChild(addBtn);
-      }
-      const rmBtn = document.createElement('button');
-      rmBtn.className='btn btn-danger btn-sm';
-      rmBtn.textContent='✕';
-      rmBtn.onclick=()=>bDiv.remove();
-      bHeader.appendChild(rmBtn);
-      bDiv.appendChild(bHeader);
-
+      const bDiv = createBlockWrapper(type, () => addTplExoUI(bDiv.querySelector('.tpl-exo-container')));
       const exoC = document.createElement('div');
       exoC.className = 'tpl-exo-container';
       bDiv.appendChild(exoC);
@@ -747,24 +1190,21 @@
 
     function addTplExoUI(container, ex) {
       const div = document.createElement('div');
-      div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap;';
+      div.className = 'tpl-exo-row';
       div.innerHTML = `
-        <input type="text" class="tpl-exo-name" placeholder="Exercice" value="${ex?escapeHtml(ex.name):''}" maxlength="200" style="flex:1;min-width:120px;padding:6px 8px;border:2px solid #16213e;border-radius:6px;background:#16213e;color:#eee;font-size:0.85rem;outline:none;">
-        <input type="number" class="tpl-exo-sets" placeholder="Séries" value="${ex?ex.setsCount:4}" min="1" max="20" style="width:50px;padding:6px;text-align:center;border:2px solid #16213e;border-radius:6px;background:#16213e;color:#eee;font-size:0.85rem;outline:none;">
-        <span style="color:#888;font-size:0.75rem;">séries</span>
-        <span style="font-size:0.75rem;">⏱</span>
-        <input type="number" class="tpl-exo-rest" placeholder="-" value="${ex&&ex.rest?ex.rest:''}" min="0" max="3600" style="width:45px;padding:6px;text-align:center;border:2px solid #16213e;border-radius:6px;background:#16213e;color:#eee;font-size:0.85rem;outline:none;">
-        <span style="color:#888;font-size:0.75rem;">s</span>
-        <button class="btn btn-danger btn-sm" style="padding:4px 8px;">✕</button>
+        <input type="text" class="tpl-exo-name" placeholder="Exercice" value="${ex?escapeHtml(ex.name):''}" maxlength="200">
+        <label class="unit-input" title="Séries"><input type="number" class="tpl-exo-sets" inputmode="numeric" placeholder="4" value="${ex?escapeHtml(ex.setsCount):4}" min="1" max="20"><span>séries</span></label>
+        <label class="unit-input" title="Repos">${icon('timer')}<input type="number" class="tpl-exo-rest" inputmode="numeric" placeholder="–" value="${ex&&ex.rest?escapeHtml(ex.rest):''}" min="0" max="3600"><span>s</span></label>
+        <button class="icon-btn danger" aria-label="Supprimer l'exercice">${icon('x','ic-sm')}</button>
       `;
-      div.querySelector('button').onclick = () => div.remove();
+      div.querySelector('button').onclick = () => removeExoFrom(div, container);
       container.appendChild(div);
     }
 
     document.getElementById('saveTplBtn').onclick = async () => {
       const name = document.getElementById('tplName').value.trim();
       const weekType = document.getElementById('tplWeekType').value.trim();
-      if (!name) return alert('Donne un nom au template');
+      if (!name) return toast('Donne un nom au template', 'error');
       const tplSessions = [];
       document.querySelectorAll('#tplSessionList > div').forEach(sDiv => {
         const sName = sDiv.querySelector('.tpl-session-name').value.trim();
@@ -790,14 +1230,16 @@
       } else {
         await fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       }
-      document.getElementById('tplModal').classList.remove('open');
+      closeModal('tplModal');
+      toast('Template enregistré');
       await loadTemplates();
     };
 
     document.getElementById('deleteTplBtn').onclick = async () => {
       if (!editingTplId||!confirm('Supprimer ce template ?')) return;
       await fetch('/api/templates/'+editingTplId,{method:'DELETE'});
-      document.getElementById('tplModal').classList.remove('open');
+      closeModal('tplModal');
+      toast('Template supprimé');
       await loadTemplates();
     };
 
@@ -806,69 +1248,95 @@
       await loadTemplates();
       const list = document.getElementById('applyTplList');
       const empty = document.getElementById('applyTplEmpty');
+      document.getElementById('applyTplWeek').textContent = 'Semaine du ' + frDateRange(currentWeekStart);
       list.innerHTML = '';
       empty.style.display = templates.length===0?'block':'none';
       templates.forEach(tpl => {
         const btn = document.createElement('div');
-        btn.className = 'tpl-card';
-        btn.innerHTML = `<div class="tpl-card-header"><span class="tpl-card-name">${escapeHtml(tpl.name)}</span><span class="tpl-card-type">${escapeHtml(tpl.weekType||'')}</span></div>
-          <div class="tpl-card-sessions">${tpl.sessions.map(s=>`<span class="tpl-day-label">${DAYS[s.dayOfWeek-1]}: ${escapeHtml(s.name)}</span>`).join(' ')}</div>`;
+        btn.className = 'tpl-card card';
+        btn.style.background = 'var(--surface-2)';
+        btn.innerHTML = templateCardHTML(tpl);
         btn.onclick = async () => {
           if (!confirm(`Appliquer "${tpl.name}" à la semaine du ${frDateRange(currentWeekStart)} ?`)) return;
           await fetch('/api/templates/'+tpl.id+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weekStart:formatDate(currentWeekStart)})});
-          document.getElementById('applyTplModal').classList.remove('open');
+          closeModal('applyTplModal');
+          toast(`"${tpl.name}" appliqué`);
           await loadSessions();
         };
         list.appendChild(btn);
       });
-      document.getElementById('applyTplModal').classList.add('open');
+      openModal('applyTplModal');
     };
-    document.getElementById('closeApplyTplBtn').onclick = () => document.getElementById('applyTplModal').classList.remove('open');
+    document.getElementById('closeApplyTplBtn').onclick = () => closeModal('applyTplModal');
 
     // --- TOP PERF ---
     async function loadPerfs() {
       const res = await fetch('/api/top-perfs');
-      const perfs = await res.json();
+      perfs = await res.json();
+      renderPerfs();
+    }
+
+    function renderPerfs() {
+      const q = document.getElementById('perfSearch').value.trim().toLowerCase();
+      const filtered = perfs.filter(p => p.exercise.toLowerCase().includes(q));
       const list = document.getElementById('perfList');
       const empty = document.getElementById('perfEmpty');
       list.innerHTML = '';
       empty.style.display = perfs.length===0?'block':'none';
-      perfs.forEach(p => {
+      filtered.forEach(p => {
+        const w = num(p.weight), r = num(p.reps);
+        // Epley estimate of the one-rep max
+        const oneRm = r > 1 && w > 0 ? Math.round(w * (1 + r/30)) : null;
         const div = document.createElement('div');
-        div.className = 'perf-card';
-        div.innerHTML = `<div><div class="perf-exo">${escapeHtml(p.exercise)}</div><div class="perf-detail">${frDate(p.date)} · ${escapeHtml(p.sessionName)}</div></div><div class="perf-value">${p.weight} kg × ${p.reps}</div>`;
+        div.className = 'perf-card card';
+        div.innerHTML = `
+          <div class="perf-avatar">${escapeHtml(p.exercise.trim().charAt(0).toUpperCase())}</div>
+          <div class="perf-info">
+            <div class="perf-exo">${escapeHtml(p.exercise)}</div>
+            <div class="perf-detail">${frDate(p.date)} · ${escapeHtml(p.sessionName)}</div>
+          </div>
+          <div class="perf-value">
+            <div class="perf-weight">${escapeHtml(p.weight)}<small>kg</small></div>
+            <div class="perf-reps">× ${escapeHtml(p.reps)}${oneRm ? ` <span class="perf-1rm">· 1RM ≈ ${oneRm}</span>` : ''}</div>
+          </div>`;
         div.onclick = () => showSessionDetail(p.sessionId);
         list.appendChild(div);
       });
     }
+    document.getElementById('perfSearch').addEventListener('input', renderPerfs);
 
     async function showSessionDetail(id) {
       const res = await fetch('/api/sessions/'+id);
-      if (!res.ok) return alert('Séance introuvable');
+      if (!res.ok) return toast('Séance introuvable', 'error');
       const s = await res.json();
       document.getElementById('detailTitle').textContent = s.name;
-      document.getElementById('detailDate').textContent = frDate(s.date);
+      document.getElementById('detailDate').textContent = frLongDate(s.date);
+      const st = sessionStats(s);
+      document.getElementById('detailStats').innerHTML = `
+        <div class="stat"><div class="stat-label">Exos</div><div class="stat-value">${st.exos}</div></div>
+        <div class="stat"><div class="stat-label">Séries</div><div class="stat-value">${st.sets}</div></div>
+        <div class="stat"><div class="stat-label">Volume</div><div class="stat-value">${formatVolume(st.volume)}</div></div>`;
       const container = document.getElementById('detailExercises');
       container.innerHTML = '';
       (s.blocks||[]).forEach(block => {
         const bDiv = document.createElement('div');
         if (block.type==='superset') {
           bDiv.className = 'block-wrapper superset';
-          bDiv.style.marginBottom = '10px';
+          bDiv.innerHTML = `<div class="block-header"><span class="block-tag">${icon('zap')}Superset</span></div>`;
         }
         (block.exercises||[]).forEach(ex => {
           const div = document.createElement('div');
           div.className = 'session-detail-exo';
-          div.innerHTML = `<h4>${escapeHtml(ex.name)}${ex.rest?' <span style="color:#888;font-size:0.8rem;">⏱ '+ex.rest+'s repos</span>':''}</h4>
+          div.innerHTML = `<h4><span>${escapeHtml(ex.name)}</span>${ex.rest?`<span class="rest-pill">${icon('timer')}${escapeHtml(ex.rest)}s</span>`:''}</h4>
             <table><thead><tr><th>Série</th><th>Reps</th><th>Poids</th></tr></thead>
-            <tbody>${(ex.sets||[]).map((set,i)=>`<tr><td>${i+1}</td><td>${set.reps}</td><td>${set.weight} kg</td></tr>`).join('')}</tbody></table>`;
+            <tbody>${(ex.sets||[]).map((set,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(set.reps)}</td><td>${escapeHtml(set.weight)} kg</td></tr>`).join('')}</tbody></table>`;
           bDiv.appendChild(div);
         });
         container.appendChild(bDiv);
       });
-      document.getElementById('detailModal').classList.add('open');
+      openModal('detailModal');
     }
-    document.getElementById('closeDetailBtn').onclick = () => document.getElementById('detailModal').classList.remove('open');
+    document.getElementById('closeDetailBtn').onclick = () => closeModal('detailModal');
 
     // --- LOAD ---
     async function loadSessions() {
@@ -877,6 +1345,7 @@
       renderWeek();
     }
 
+    renderWeek();
     loadSessions();
     loadTemplates();
     setInterval(loadSessions, 5000);
