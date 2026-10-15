@@ -7,6 +7,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MoggTrack">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <title>MoggTrack</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23c8f53b'/%3E%3Cpath d='M18 40V24l14 10 14-10v16' fill='none' stroke='%230b0d02' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -94,6 +97,28 @@
     .brand-mark .ic { width: 18px; height: 18px; stroke-width: 2.5; }
     .brand span { color: var(--accent); }
     .appbar-date { font-size: 0.8rem; color: var(--muted); text-transform: capitalize; }
+    .appbar-right { display: flex; align-items: center; gap: 12px; }
+
+    /* --- LOGIN --- */
+    .login {
+      position: fixed; inset: 0; z-index: 500;
+      display: grid; place-items: center;
+      padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+      background:
+        radial-gradient(700px 400px at 20% 0%, rgba(200,245,59,0.12), transparent 70%),
+        radial-gradient(600px 400px at 100% 100%, rgba(167,139,250,0.12), transparent 70%),
+        var(--bg);
+      animation: fadeIn .3s ease;
+    }
+    .login-card { width: 100%; max-width: 360px; text-align: center; animation: popIn .4s var(--ease); }
+    .login-mark { width: 68px; height: 68px; border-radius: 22px; margin: 0 auto 20px; }
+    .login-mark .ic { width: 34px; height: 34px; }
+    .login h1 { font-family: var(--font-display); font-size: 2.2rem; font-weight: 700; letter-spacing: -0.03em; }
+    .login h1 span { color: var(--accent); }
+    .login .sub { color: var(--muted); font-size: 0.95rem; margin: 8px 0 28px; }
+    .login input[type=password] { height: 54px; text-align: center; font-size: 17px; background: var(--surface); }
+    .login .btn { margin-top: 12px; height: 54px; }
+    .login-error { color: var(--danger); font-size: 0.85rem; font-weight: 500; margin-top: 12px; }
 
     /* --- PAGES --- */
     .page {
@@ -333,7 +358,7 @@
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .form-grid .full { grid-column: 1 / -1; }
     .form-row label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
-    .modal input[type=text], .modal input[type=date], .modal input[type=number], .modal select, .search input {
+    .modal input[type=text], .modal input[type=date], .modal input[type=number], .modal select, .search input, .login input[type=password] {
       width: 100%;
       height: 46px;
       padding: 0 14px;
@@ -347,8 +372,8 @@
       -webkit-appearance: none;
       appearance: none;
     }
-    .modal input:focus, .modal select:focus, .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(200,245,59,0.12); }
-    .modal input::placeholder, .search input::placeholder { color: var(--subtle); }
+    .modal input:focus, .modal select:focus, .search input:focus, .login input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(200,245,59,0.12); }
+    .modal input::placeholder, .search input::placeholder, .login input::placeholder { color: var(--subtle); }
     .modal input[type=date] { color-scheme: dark; }
     .modal select {
       padding-right: 34px;
@@ -594,6 +619,7 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
     <symbol id="i-logo" viewBox="0 0 24 24"><path d="M5 17V7l7 5 7-5v10"/></symbol>
   </svg>
 
@@ -603,8 +629,24 @@
       <div class="brand-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
       <div>Mogg<span>Track</span></div>
     </div>
-    <div class="appbar-date" id="todayLabel"></div>
+    <div class="appbar-right">
+      <div class="appbar-date" id="todayLabel"></div>
+      <button class="icon-btn" id="logoutBtn" aria-label="Se déconnecter" title="Se déconnecter"><svg class="ic ic-sm"><use href="#i-logout"/></svg></button>
+    </div>
   </header>
+
+  <!-- CONNEXION -->
+  <div class="login" id="loginScreen" hidden>
+    <form class="login-card" id="loginForm">
+      <div class="brand-mark login-mark"><svg class="ic"><use href="#i-logo"/></svg></div>
+      <h1>Mogg<span>Track</span></h1>
+      <p class="sub">Entre ton mot de passe pour accéder à tes séances.</p>
+      <input type="text" autocomplete="username" value="moggtrack" hidden>
+      <input type="password" id="loginPassword" placeholder="Mot de passe" autocomplete="current-password" required>
+      <p class="login-error" id="loginError" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit" id="loginBtn">Se connecter</button>
+    </form>
+  </div>
 
   <!-- PAGE: CALENDRIER -->
   <main class="page active" id="page-calendar">
@@ -793,6 +835,88 @@
     const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
     const DAYS_SHORT = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
     const DAYS_LETTER = ['L','M','M','J','V','S','D'];
+
+    // --- API & CONNEXION ---
+    const TOKEN_KEY = 'moggtrack-token';
+    function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } }
+    function setToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+
+    async function api(url, opts = {}) {
+      const headers = { 'Authorization': 'Bearer ' + (getToken() || '') };
+      if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+      let res;
+      try {
+        res = await fetch(url, { method: opts.method || 'GET', headers, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
+      } catch (e) {
+        throw new Error('Pas de connexion : réessaie quand tu seras en ligne');
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || data.code === 'NO_PASSWORD') {
+        showLogin(data.code === 'NO_PASSWORD' ? data.error : 'Session expirée, reconnecte-toi');
+        const err = new Error(data.error || 'Non autorisé');
+        err.silent = true;
+        throw err;
+      }
+      if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+      return data;
+    }
+    // Les erreurs des actions (sauvegarde, suppression…) s'affichent en toast
+    window.addEventListener('unhandledrejection', e => {
+      if (e.reason && e.reason.silent) return;
+      toast((e.reason && e.reason.message) || 'Une erreur est survenue', 'error');
+    });
+
+    let pollTimer = null;
+    function startApp() {
+      document.getElementById('loginScreen').hidden = true;
+      loadSessions();
+      loadTemplates();
+      if (!pollTimer) pollTimer = setInterval(() => { if (!document.hidden) loadSessions().catch(() => {}); }, 5000);
+    }
+    function showLogin(message) {
+      setToken(null);
+      clearInterval(pollTimer); pollTimer = null;
+      sessions = []; templates = []; perfs = [];
+      if ('caches' in window) caches.delete('moggtrack-api').catch(() => {});
+      document.querySelectorAll('.modal-overlay.open').forEach(o => closeModal(o.id));
+      const err = document.getElementById('loginError');
+      err.textContent = message || '';
+      err.hidden = !message;
+      document.getElementById('loginScreen').hidden = false;
+      setTimeout(() => document.getElementById('loginPassword').focus(), 50);
+    }
+    document.getElementById('loginForm').onsubmit = async e => {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      const input = document.getElementById('loginPassword');
+      const err = document.getElementById('loginError');
+      btn.disabled = true; btn.textContent = 'Connexion…'; err.hidden = true;
+      try {
+        let res;
+        try {
+          res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input.value }) });
+        } catch (e) { throw new Error('Pas de connexion internet'); }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Connexion impossible');
+        setToken(data.token);
+        input.value = '';
+        startApp();
+        toast('Connecté');
+      } catch (e2) {
+        err.textContent = e2.message;
+        err.hidden = false;
+        input.select();
+      } finally {
+        btn.disabled = false; btn.textContent = 'Se connecter';
+      }
+    };
+    document.getElementById('logoutBtn').onclick = () => {
+      if (!confirm('Se déconnecter de cet appareil ?')) return;
+      showLogin();
+      renderWeek();
+    };
+    window.addEventListener('offline', () => toast('Hors connexion : les modifications ne seront pas enregistrées', 'error'));
+    window.addEventListener('online', () => { toast('De nouveau en ligne'); if (getToken()) loadSessions().catch(() => {}); });
 
     // --- UTILS ---
     function icon(name, cls) { return `<svg class="ic ${cls||''}"><use href="#i-${name}"/></svg>`; }
@@ -1060,9 +1184,9 @@
       });
       const body = {date, name, blocks};
       if (editingSessionId) {
-        await fetch('/api/sessions/'+editingSessionId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        await api('/api/sessions/'+editingSessionId,{method:'PUT',body:body});
       } else {
-        await fetch('/api/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        await api('/api/sessions',{method:'POST',body:body});
       }
       closeModal('sessionModal');
       toast('Séance enregistrée');
@@ -1071,7 +1195,7 @@
 
     document.getElementById('deleteSessionBtn').onclick = async () => {
       if (!editingSessionId||!confirm('Supprimer cette séance ?')) return;
-      await fetch('/api/sessions/'+editingSessionId,{method:'DELETE'});
+      await api('/api/sessions/'+editingSessionId,{method:'DELETE'});
       closeModal('sessionModal');
       toast('Séance supprimée');
       await loadSessions();
@@ -1081,8 +1205,7 @@
     // TEMPLATES
     // ===========================================
     async function loadTemplates() {
-      const res = await fetch('/api/templates');
-      const data = await res.json();
+      const data = await api('/api/templates');
       templates = Array.isArray(data) ? data : [];
       renderTemplates();
     }
@@ -1227,9 +1350,9 @@
       });
       const body = {name, weekType, sessions:tplSessions};
       if (editingTplId) {
-        await fetch('/api/templates/'+editingTplId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        await api('/api/templates/'+editingTplId,{method:'PUT',body:body});
       } else {
-        await fetch('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        await api('/api/templates',{method:'POST',body:body});
       }
       closeModal('tplModal');
       toast('Template enregistré');
@@ -1238,7 +1361,7 @@
 
     document.getElementById('deleteTplBtn').onclick = async () => {
       if (!editingTplId||!confirm('Supprimer ce template ?')) return;
-      await fetch('/api/templates/'+editingTplId,{method:'DELETE'});
+      await api('/api/templates/'+editingTplId,{method:'DELETE'});
       closeModal('tplModal');
       toast('Template supprimé');
       await loadTemplates();
@@ -1259,7 +1382,7 @@
         btn.innerHTML = templateCardHTML(tpl);
         btn.onclick = async () => {
           if (!confirm(`Appliquer "${tpl.name}" à la semaine du ${frDateRange(currentWeekStart)} ?`)) return;
-          await fetch('/api/templates/'+tpl.id+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weekStart:formatDate(currentWeekStart)})});
+          await api('/api/templates/'+tpl.id+'/apply',{method:'POST',body:{weekStart:formatDate(currentWeekStart)}});
           closeModal('applyTplModal');
           toast(`"${tpl.name}" appliqué`);
           await loadSessions();
@@ -1272,8 +1395,7 @@
 
     // --- TOP PERF ---
     async function loadPerfs() {
-      const res = await fetch('/api/top-perfs');
-      const data = await res.json();
+      const data = await api('/api/top-perfs');
       perfs = Array.isArray(data) ? data : [];
       renderPerfs();
     }
@@ -1308,9 +1430,7 @@
     document.getElementById('perfSearch').addEventListener('input', renderPerfs);
 
     async function showSessionDetail(id) {
-      const res = await fetch('/api/sessions/'+id);
-      if (!res.ok) return toast('Séance introuvable', 'error');
-      const s = await res.json();
+      const s = await api('/api/sessions/'+id);
       document.getElementById('detailTitle').textContent = s.name;
       document.getElementById('detailDate').textContent = frLongDate(s.date);
       const st = sessionStats(s);
@@ -1342,16 +1462,17 @@
 
     // --- LOAD ---
     async function loadSessions() {
-      const res = await fetch('/api/sessions');
-      const data = await res.json();
+      const data = await api('/api/sessions');
       sessions = Array.isArray(data) ? data : [];
       renderWeek();
     }
 
     renderWeek();
-    loadSessions();
-    loadTemplates();
-    setInterval(loadSessions, 5000);
+    if (getToken()) startApp(); else showLogin();
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    }
   </script>
 </body>
 </html>

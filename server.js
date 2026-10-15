@@ -17,7 +17,53 @@ const MONGODB_URI = (process.env.MONGODB_URI || '')
 const MONGODB_DBNAME = process.env.MONGODB_DBNAME || 'moggtrack';
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    // Le service worker et la page doivent toujours être revalidés pour recevoir les mises à jour
+    if (/(sw\.js|index\.html)$/.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+  }
+}));
+
+// --- AUTHENTIFICATION (mot de passe unique défini dans la variable APP_PASSWORD) ---
+const APP_PASSWORD = (process.env.APP_PASSWORD || '').trim();
+const TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+
+function safeEqual(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+// Signé avec le mot de passe : le changer déconnecte tous les appareils
+function signToken(payload) {
+  return crypto.createHmac('sha256', 'moggtrack:' + APP_PASSWORD).update(payload).digest('base64url');
+}
+function createToken() {
+  const exp = String(Date.now() + TOKEN_TTL_MS);
+  return `${exp}.${signToken(exp)}`;
+}
+function isValidToken(token) {
+  const [exp, sig] = String(token || '').split('.');
+  if (!exp || !sig || !(Number(exp) > Date.now())) return false;
+  return safeEqual(sig, signToken(exp));
+}
+
+const NO_PASSWORD = { error: 'Mot de passe non configuré : ajoute la variable APP_PASSWORD', code: 'NO_PASSWORD' };
+
+app.post('/api/login', async (req, res) => {
+  if (!APP_PASSWORD) return res.status(503).json(NO_PASSWORD);
+  if (!safeEqual((req.body && req.body.password) || '', APP_PASSWORD)) {
+    await new Promise(r => setTimeout(r, 800)); // ralentit les essais en série
+    return res.status(401).json({ error: 'Mot de passe incorrect', code: 'BAD_PASSWORD' });
+  }
+  res.json({ token: createToken() });
+});
+
+app.use('/api', (req, res, next) => {
+  if (!APP_PASSWORD) return res.status(503).json(NO_PASSWORD);
+  const token = (req.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  if (!isValidToken(token)) return res.status(401).json({ error: 'Non autorisé', code: 'UNAUTHORIZED' });
+  next();
+});
 
 let db, sessionsCol, templatesCol, tasksCol;
 
