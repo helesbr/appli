@@ -257,7 +257,13 @@
     }
 
     /* --- STATS --- */
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .stats { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; margin-bottom: 16px; }
+    .stat-week { cursor: default; }
+    .stat-week.empty-week { cursor: pointer; }
+    .stat-week .stat-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); }
+    .stat-week.empty-week .stat-value { color: var(--subtle); }
+    .stat-sub { font-size: 0.75rem; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stat-week.empty-week .stat-sub { color: var(--accent); font-weight: 600; }
     .stat { padding: 14px 12px; position: relative; overflow: hidden; }
     .ring { position: absolute; bottom: 14px; right: 12px; width: 28px; height: 28px; transform: rotate(-90deg); }
     .ring circle { fill: none; stroke-width: 5; }
@@ -838,8 +844,11 @@
         <svg class="ring" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring-bg" cx="20" cy="20" r="16"/><circle class="ring-fg" id="statRing" cx="20" cy="20" r="16"/></svg>
         <div class="stat-label">Séances</div><div class="stat-value" id="statSessions">0</div>
       </div>
-      <div class="stat card"><div class="stat-label">Séries</div><div class="stat-value" id="statSets">0</div></div>
-      <div class="stat card"><div class="stat-label">Volume</div><div class="stat-value" id="statVolume">0</div></div>
+      <div class="stat card stat-week" id="weekTypeTile">
+        <div class="stat-label">Type de semaine</div>
+        <div class="stat-value" id="weekTypeValue">–</div>
+        <div class="stat-sub" id="weekTypeSub"></div>
+      </div>
     </div>
 
     <div class="week-list">
@@ -1222,7 +1231,8 @@
       document.getElementById('todayBtn').hidden = isCurrent;
 
       const today = formatDate(new Date());
-      let totalSessions = 0, doneSessions = 0, totalSets = 0, totalVolume = 0;
+      let totalSessions = 0, doneSessions = 0;
+      const weekTypes = {};
       for (let i=0;i<7;i++) {
         const cell = document.getElementById('d'+i);
         const d = new Date(currentWeekStart);
@@ -1233,7 +1243,11 @@
         cell.dataset.date = dateStr;
         const chips = daySessions.map(s => {
           const st = sessionStats(s);
-          totalSessions++; totalSets += st.sets; totalVolume += st.volume;
+          totalSessions++;
+          if (s.weekType || s.templateName) {
+            const k = JSON.stringify([s.weekType || '', s.templateName || '']);
+            weekTypes[k] = (weekTypes[k] || 0) + 1;
+          }
           if (s.completed) doneSessions++;
           return `<div class="session-dot${s.completed?' completed':''}" data-id="${escapeHtml(s.id)}">
             <div class="s-info">
@@ -1259,9 +1273,27 @@
       document.getElementById('statSessions').innerHTML = totalSessions ? `${doneSessions}<small>/${totalSessions}</small>` : '0';
       document.getElementById('statRing').style.strokeDashoffset = 100.53 * (1 - (totalSessions ? doneSessions / totalSessions : 0));
       renderHero();
-      document.getElementById('statSets').textContent = totalSets;
-      document.getElementById('statVolume').innerHTML = formatVolume(totalVolume);
+      renderWeekType(weekTypes);
     }
+    // Type de la semaine affichée : celui du template appliqué (le plus fréquent si plusieurs)
+    function renderWeekType(weekTypes) {
+      const tile = document.getElementById('weekTypeTile');
+      const best = Object.entries(weekTypes).sort((a, b) => b[1] - a[1])[0];
+      if (best) {
+        const [type, tplName] = JSON.parse(best[0]);
+        document.getElementById('weekTypeValue').textContent = type || tplName;
+        document.getElementById('weekTypeSub').textContent = type ? tplName : '';
+        tile.classList.remove('empty-week');
+      } else {
+        document.getElementById('weekTypeValue').textContent = 'Libre';
+        document.getElementById('weekTypeSub').textContent = '+ Appliquer un template';
+        tile.classList.add('empty-week');
+      }
+    }
+    document.getElementById('weekTypeTile').onclick = () => {
+      if (document.getElementById('weekTypeTile').classList.contains('empty-week')) document.getElementById('applyTplBtn').click();
+    };
+
     // Carte du jour : séance à lancer, séance faite, ou jour de repos
     function renderHero() {
       const el = document.getElementById('heroCard');
