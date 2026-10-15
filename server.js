@@ -128,6 +128,9 @@ app.post('/api/templates/:id/apply', async (req, res) => {
         id: crypto.randomUUID(),
         date: dateStr,
         name: tplSession.name,
+        // Mémorise la semaine type d'origine pour l'afficher dans le calendrier
+        templateName: tpl.name,
+        weekType: tpl.weekType || '',
         blocks: tplSession.blocks.map(b => ({
           type: b.type,
           exercises: b.exercises.map(ex => ({
