@@ -16,7 +16,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 let db, sessionsCol, templatesCol, tasksCol;
 
 async function connectMongo() {
-  const client = new MongoClient(MONGODB_URI);
+  if (!MONGODB_URI) throw new Error('Variable MONGODB_URI manquante');
+  const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
   await client.connect();
   db = client.db(MONGODB_DBNAME);
   sessionsCol = db.collection('sessions');
@@ -25,8 +26,19 @@ async function connectMongo() {
   console.log('Connecté à MongoDB Atlas');
 }
 
-const mongoReady = connectMongo();
-mongoReady.catch(e => {
+// Connexion partagée ; en cas d'échec, on retentera à la requête suivante
+let mongoReady = null;
+function ensureMongo() {
+  if (!mongoReady) {
+    mongoReady = connectMongo().catch(e => {
+      mongoReady = null;
+      throw e;
+    });
+  }
+  return mongoReady;
+}
+
+ensureMongo().catch(e => {
   console.error('Erreur MongoDB:', e);
   if (!process.env.VERCEL) process.exit(1);
 });
@@ -34,10 +46,14 @@ mongoReady.catch(e => {
 // Sur Vercel, une requête peut arriver avant la fin de la connexion
 app.use('/api', async (req, res, next) => {
   try {
-    await mongoReady;
+    await ensureMongo();
     next();
   } catch (e) {
-    res.status(500).json({ error: 'Erreur MongoDB' });
+    console.error('Erreur MongoDB:', e);
+    res.status(500).json({
+      error: 'Erreur MongoDB',
+      detail: `${e.name}: ${String(e.message).slice(0, 200)}`
+    });
   }
 });
 

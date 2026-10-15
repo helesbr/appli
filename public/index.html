@@ -1082,7 +1082,8 @@
     // ===========================================
     async function loadTemplates() {
       const res = await fetch('/api/templates');
-      templates = await res.json();
+      const data = await res.json();
+      templates = Array.isArray(data) ? data : [];
       renderTemplates();
     }
 
@@ -1272,7 +1273,8 @@
     // --- TOP PERF ---
     async function loadPerfs() {
       const res = await fetch('/api/top-perfs');
-      perfs = await res.json();
+      const data = await res.json();
+      perfs = Array.isArray(data) ? data : [];
       renderPerfs();
     }
 
@@ -1341,7 +1343,8 @@
     // --- LOAD ---
     async function loadSessions() {
       const res = await fetch('/api/sessions');
-      sessions = await res.json();
+      const data = await res.json();
+      sessions = Array.isArray(data) ? data : [];
       renderWeek();
     }
 
