@@ -133,7 +133,8 @@ app.post('/api/templates/:id/apply', async (req, res) => {
           exercises: b.exercises.map(ex => ({
             name: ex.name,
             rest: ex.rest || 0,
-            sets: Array.from({ length: ex.setsCount }, () => ({ reps: 0, weight: 0 }))
+            // Séries planifiées : objectif de reps, charges à remplir à la salle
+            sets: Array.from({ length: ex.setsCount }, () => ({ reps: '', weight: '', target: ex.reps || '' }))
           }))
         }))
       };
@@ -166,14 +167,17 @@ app.get('/api/top-perfs', async (req, res) => {
     sessions.forEach(session => {
       const exercises = flattenExercises(session);
       exercises.forEach(ex => {
-        const key = ex.name.toLowerCase();
+        const key = (ex.name || '').trim().toLowerCase();
         (ex.sets || []).forEach(set => {
-          if (!perfs[key] || set.weight > perfs[key].weight ||
-             (set.weight === perfs[key].weight && set.reps > perfs[key].reps)) {
+          const weight = Number(set.weight) || 0;
+          const reps = Number(set.reps) || 0;
+          if (!key || (!weight && !reps)) return; // série pas encore faite
+          if (!perfs[key] || weight > perfs[key].weight ||
+             (weight === perfs[key].weight && reps > perfs[key].reps)) {
             perfs[key] = {
-              exercise: ex.name,
-              weight: set.weight,
-              reps: set.reps,
+              exercise: ex.name.trim(),
+              weight,
+              reps,
               sessionId: session.id,
               sessionName: session.name,
               date: session.date
@@ -220,6 +224,7 @@ app.post('/api/templates', async (req, res) => {
         exercises: (b.exercises || []).map(ex => ({
           name: (ex.name || '').trim().slice(0, 200),
           setsCount: Math.max(1, Math.min(20, parseInt(ex.setsCount) || 4)),
+          reps: String(ex.reps ?? '').trim().slice(0, 20),
           rest: Math.max(0, Math.min(3600, parseInt(ex.rest) || 0))
         }))
       }))
@@ -248,6 +253,7 @@ app.put('/api/templates/:id', async (req, res) => {
         exercises: (b.exercises || []).map(ex => ({
           name: (ex.name || '').trim().slice(0, 200),
           setsCount: Math.max(1, Math.min(20, parseInt(ex.setsCount) || 4)),
+          reps: String(ex.reps ?? '').trim().slice(0, 20),
           rest: Math.max(0, Math.min(3600, parseInt(ex.rest) || 0))
         }))
       }))
@@ -314,10 +320,12 @@ app.post('/api/sessions', async (req, res) => {
 // --- PUT modifier une séance ---
 app.put('/api/sessions/:id', async (req, res) => {
   try {
-    const { date, name, blocks } = req.body;
+    const { date, name, blocks, completed } = req.body;
+    const update = { date, name, blocks };
+    if (typeof completed === 'boolean') update.completed = completed;
     const result = await sessionsCol.findOneAndUpdate(
       { id: req.params.id },
-      { $set: { date, name, blocks } },
+      { $set: update },
       { returnDocument: 'after' }
     );
     if (!result) return res.status(404).json({ error: 'Séance introuvable' });
