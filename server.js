@@ -7,7 +7,13 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI;
+// Nettoie les erreurs de copier-coller courantes (espaces, retours à la ligne, guillemets, "MONGODB_URI=")
+const MONGODB_URI = (process.env.MONGODB_URI || '')
+  .replace(/\s+/g, '')
+  .replace(/^["']+|["']+$/g, '')
+  .replace(/^MONGODB_URI=/i, '')
+  .replace(/^["']+|["']+$/g, '')
+  .replace(/MONGODB_DBNAME=.*$/i, '');
 const MONGODB_DBNAME = process.env.MONGODB_DBNAME || 'moggtrack';
 
 app.use(express.json());
@@ -16,7 +22,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 let db, sessionsCol, templatesCol, tasksCol;
 
 async function connectMongo() {
-  if (!MONGODB_URI) throw new Error('Variable MONGODB_URI manquante');
+  if (!MONGODB_URI) throw new Error('Variable MONGODB_URI manquante ou vide');
+  if (!/^mongodb(\+srv)?:\/\//.test(MONGODB_URI)) {
+    throw new Error(`MONGODB_URI doit commencer par mongodb+srv:// (début actuel : "${MONGODB_URI.slice(0, 12)}…", ${MONGODB_URI.length} caractères)`);
+  }
   const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
   await client.connect();
   db = client.db(MONGODB_DBNAME);
