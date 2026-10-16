@@ -80,3 +80,7 @@ Déposer un fichier `public/music.mp3` puis relancer le rendu : il est détecté
 - Les noms de marque n'apparaissent qu'en texte simple ou à travers les images fournies ; aucun logo n'est redessiné.
 - La jauge du smartphone (0 → 78 %) est redessinée par-dessus l'écran de `produit.png`.
 - Les polices sont embarquées (`@remotion/fonts`) : le rendu ne dépend pas du réseau.
+
+## Sound design
+
+Les bruitages se placent dans `public/sfx/` ; leurs repères (image de départ, volume, vitesse, durée, fondu) sont dans `src/lib/sound.ts`. Un fichier absent est ignoré. `bip.mp3` (le bip de la gourde) est synthétisé. Quand des bruitages sont présents, la musique de fond descend à 0,4 pour leur laisser la place.
