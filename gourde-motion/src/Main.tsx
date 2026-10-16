@@ -1,6 +1,6 @@
 import React from 'react';
-import {AbsoluteFill, Audio, getStaticFiles, interpolate, Sequence, staticFile} from 'remotion';
-import {MUSIC_VOLUME_WITH_SFX, SFX} from './lib/sound';
+import {AbsoluteFill, Audio, getRemotionEnvironment, getStaticFiles, interpolate, Sequence, staticFile} from 'remotion';
+import {MASTER_GAIN, MUSIC_VOLUME_WITH_SFX, SFX} from './lib/sound';
 import {SceneTransition, TransitionKind} from './components/Transitions';
 import {SceneOffset} from './lib/layout';
 import {easeInOut} from './lib/anim';
@@ -37,6 +37,8 @@ const ORDER: SceneId[] = ['hook', 'problem', 'patch', 'bottle', 'app', 'outro'];
 const MUSIC = 'music.mp3';
 const hasFile = (name: string) => getStaticFiles().some((f) => f.name === name);
 const hasMusic = () => hasFile(MUSIC);
+/** Gain master au rendu ; plafonné à 1 dans le studio (limite du navigateur). */
+const master = (v: number) => (getRemotionEnvironment().isRendering ? v * MASTER_GAIN : Math.min(1, v));
 const musicVol = () => (SFX.some((c) => hasFile(`sfx/${c.file}`)) ? MUSIC_VOLUME_WITH_SFX : 0.8);
 
 /** Bruitages présents dans public/sfx/ (les repères sans fichier sont ignorés). */
@@ -51,8 +53,9 @@ const SoundDesign: React.FC = () => (
 					<Audio
 						src={staticFile(`sfx/${c.file}`)}
 						playbackRate={rate}
+						toneFrequency={c.pitch}
 						trimBefore={c.trim ? Math.round(c.trim * FPS) : undefined}
-						volume={(f) => c.volume * interpolate(f, [dur - fade, dur], [1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})}
+						volume={(f) => master(c.volume * interpolate(f, [dur - fade, dur], [1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}))}
 					/>
 				</Sequence>
 			);
@@ -81,11 +84,11 @@ export const Main: React.FC = () => (
 			<Audio
 				src={staticFile(MUSIC)}
 				volume={(f) =>
-					interpolate(f, [0, 30, TOTAL_DURATION - 45, TOTAL_DURATION], [0, musicVol(), musicVol(), 0], {
+					master(interpolate(f, [0, 30, TOTAL_DURATION - 45, TOTAL_DURATION], [0, musicVol(), musicVol(), 0], {
 						easing: easeInOut,
 						extrapolateLeft: 'clamp',
 						extrapolateRight: 'clamp',
-					})
+					}))
 				}
 			/>
 		) : null}

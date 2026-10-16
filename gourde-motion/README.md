@@ -83,4 +83,17 @@ Déposer un fichier `public/music.mp3` puis relancer le rendu : il est détecté
 
 ## Sound design
 
-Les bruitages se placent dans `public/sfx/` ; leurs repères (image de départ, volume, vitesse, durée, fondu) sont dans `src/lib/sound.ts`. Un fichier absent est ignoré. `bip.mp3` (le bip de la gourde) est synthétisé. Quand des bruitages sont présents, la musique de fond descend à 0,4 pour leur laisser la place.
+Les bruitages sont dans `public/sfx/` ; leurs repères (image de départ, volume, vitesse, hauteur, durée, fondu) sont dans `src/lib/sound.ts`. Un fichier absent est ignoré.
+
+| Fichier | Utilisation |
+| --- | --- |
+| `led-on.mp3` | clic d'allumage de la LED (0 s) |
+| `riser.mp3` | tracé de la ligne LED, compteur 1,5 L, redosage, jauge |
+| `impact.mp3` | arrivée du titre, signature finale (plus grave) |
+| `whoosh.mp3` | les 5 transitions, pic calé sur le cut |
+| `pop.mp3` | gouttes (hauteur abaissée), libellés du patch, 78 % atteint |
+| `bass.mp3` | « Boire trop tard », renfort de la signature |
+| `sonar.mp3` | ondes du patch |
+| `bip.mp3` | bips de la gourde (synthétisé), liaison Bluetooth |
+
+Un gain master de +4,5 dB est appliqué au rendu (`MASTER_GAIN`) : environ -16 LUFS, crête vraie -0,9 dBFS. Quand une musique `public/music.mp3` est présente, elle descend à 0,4 sous les bruitages.
