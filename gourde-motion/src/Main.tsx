@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, Audio, getRemotionEnvironment, getStaticFiles, interpolate, Sequence, staticFile} from 'remotion';
-import {MASTER_GAIN, MUSIC_VOLUME_WITH_SFX, SFX} from './lib/sound';
+import {MASTER_GAIN, MUSIC_DUCKS, MUSIC_OFFSET, MUSIC_VOLUME_WITH_SFX, SFX} from './lib/sound';
 import {SceneTransition, TransitionKind} from './components/Transitions';
 import {SceneOffset} from './lib/layout';
 import {easeInOut} from './lib/anim';
@@ -81,16 +81,25 @@ export const Main: React.FC = () => (
 		})}
 		<SoundDesign />
 		{hasMusic() ? (
-			<Audio
-				src={staticFile(MUSIC)}
-				volume={(f) =>
-					master(interpolate(f, [0, 30, TOTAL_DURATION - 45, TOTAL_DURATION], [0, musicVol(), musicVol(), 0], {
-						easing: easeInOut,
-						extrapolateLeft: 'clamp',
-						extrapolateRight: 'clamp',
-					}))
-				}
-			/>
+			<Sequence from={MUSIC_OFFSET} layout="none" name="musique">
+				<Audio
+					src={staticFile(MUSIC)}
+					volume={(f) => {
+						const g = f + MUSIC_OFFSET; // image dans la vidéo complète
+						const fade = interpolate(g, [MUSIC_OFFSET, 30, TOTAL_DURATION - 45, TOTAL_DURATION], [0, 1, 1, 0], {
+							easing: easeInOut,
+							extrapolateLeft: 'clamp',
+							extrapolateRight: 'clamp',
+						});
+						const duck = MUSIC_DUCKS.reduce(
+							(acc, [at, len, level]) =>
+								Math.min(acc, interpolate(g, [at - 2, at + 2, at + len - 12, at + len], [1, level, level, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})),
+							1,
+						);
+						return master(musicVol() * fade * duck);
+					}}
+				/>
+			</Sequence>
 		) : null}
 	</AbsoluteFill>
 );

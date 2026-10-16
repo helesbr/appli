@@ -34,7 +34,7 @@ export const SFX: Cue[] = [
 	// 1. Accroche : clic de la LED, montée pendant le tracé, impact sous le titre
 	{file: 'led-on.mp3', at: 0, volume: 0.55},
 	{file: 'riser.mp3', at: 0, volume: 0.55, rate: 1.9, duration: 1},
-	{file: 'impact.mp3', at: 24, volume: 0.8, duration: 3},
+	{file: 'impact.mp3', at: 24, volume: 0.62, duration: 3},
 
 	// Transitions : le pic du whoosh tombe sur le cut
 	whoosh(SCENES.problem.from, 0.55),
@@ -52,9 +52,9 @@ export const SFX: Cue[] = [
 	{file: 'sonar.mp3', at: 304, volume: 0.35, duration: 1.5},
 	{file: 'sonar.mp3', at: 344, volume: 0.22, duration: 1.5},
 	{file: 'sonar.mp3', at: 384, volume: 0.14, duration: 1.5},
-	{file: 'pop.mp3', at: 343, volume: 0.4},
-	{file: 'pop.mp3', at: 355, volume: 0.4, pitch: 1.12},
-	{file: 'pop.mp3', at: 367, volume: 0.4, pitch: 1.25},
+	{file: 'pop.mp3', at: 343, volume: 0.32},
+	{file: 'pop.mp3', at: 355, volume: 0.32, pitch: 1.12},
+	{file: 'pop.mp3', at: 367, volume: 0.32, pitch: 1.25},
 
 	// 4. Gourde : bips synchronisés avec la LED, puis redosage
 	{file: 'bip.mp3', at: 476, volume: 0.4},
@@ -71,8 +71,7 @@ export const SFX: Cue[] = [
 	{file: 'bip.mp3', at: 714, volume: 0.2, pitch: 1.2},
 
 	// 6. Clôture : impact grave et long sous la signature
-	{file: 'impact.mp3', at: 815, volume: 0.7, rate: 0.85, pitch: 0.8, duration: 2.8, fadeOut: 0.8},
-	{file: 'bass.mp3', at: 815, volume: 0.12, pitch: 0.85, duration: 1.4, fadeOut: 0.8},
+	{file: 'impact.mp3', at: 815, volume: 0.58, rate: 0.85, pitch: 0.8, duration: 2.8, fadeOut: 0.8},
 ];
 
 /**
@@ -82,5 +81,18 @@ export const SFX: Cue[] = [
 export const MASTER_GAIN = 1.68;
 
 /** Volume de la musique de fond quand des bruitages sont présents (sinon 0,8). */
-export const MUSIC_VOLUME_WITH_SFX = 0.4;
+export const MUSIC_VOLUME_WITH_SFX = 0.21;
+
+/**
+ * Décalage de la musique (images) : le silence du morceau (26,3–27,1 s) tombe sur le
+ * plan produit final et le retour du beat sur l'impact de la signature (image 815).
+ */
+export const MUSIC_OFFSET = 3;
+
+/** Atténuation de la musique sous les impacts (ducking) : [image, durée en images, niveau]. */
+export const MUSIC_DUCKS: [number, number, number][] = [
+	[24, 40, 0.55], // titre
+	[200, 36, 0.6], // « Boire trop tard »
+	[813, 50, 0.6], // signature (retour du beat)
+];
 

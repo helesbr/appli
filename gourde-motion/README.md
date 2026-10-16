@@ -96,4 +96,6 @@ Les bruitages sont dans `public/sfx/` ; leurs repères (image de départ, volume
 | `sonar.mp3` | ondes du patch |
 | `bip.mp3` | bips de la gourde (synthétisé), liaison Bluetooth |
 
-Un gain master de +4,5 dB est appliqué au rendu (`MASTER_GAIN`) : environ -16 LUFS, crête vraie -0,9 dBFS. Quand une musique `public/music.mp3` est présente, elle descend à 0,4 sous les bruitages.
+Un gain master de +4,5 dB est appliqué au rendu (`MASTER_GAIN`) : environ -16 LUFS, crête vraie -1,1 dBFS.
+
+Musique de fond : `public/music.mp3` (non versionnée, voir `.gitignore`). Elle est décalée de 3 images (`MUSIC_OFFSET`) pour que son silence tombe sur le plan produit final et que le beat reparte sur la signature. Son volume est réglé par `MUSIC_VOLUME_WITH_SFX` et elle est atténuée sous les impacts (`MUSIC_DUCKS`).
