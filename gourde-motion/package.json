@@ -1,0 +1,25 @@
+{
+  "name": "gourde-motion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Motion design 30 s — Gourde connectée (Decathlon CMA CGM Team) — projet EPF FGE3",
+  "scripts": {
+    "studio": "remotion studio",
+    "render:16x9": "remotion render GourdeConnectee out/gourde-connectee-16x9.mp4 --codec=h264 --crf=18",
+    "render:9x16": "remotion render GourdeConnecteeVertical out/gourde-connectee-9x16.mp4 --codec=h264 --crf=18",
+    "still:thumb": "remotion still GourdeConnectee out/miniature-scene4.png --frame=500",
+    "render:all": "npm run render:16x9 && npm run render:9x16 && npm run still:thumb",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.536",
+    "@remotion/fonts": "4.0.536",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.536"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "typescript": "5.8.3"
+  }
+}
