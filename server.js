@@ -141,9 +141,11 @@ function ensureMongo() {
   return mongoReady;
 }
 
+// Pas d'arrêt si la base est injoignable : la page reste servie, l'API renvoie
+// l'erreur et la connexion est retentée à chaque requête (comme sur Vercel)
 ensureMongo().catch(e => {
-  console.error('Erreur MongoDB:', e);
-  if (!process.env.VERCEL && require.main === module) process.exit(1);
+  console.error('Erreur MongoDB:', e.message);
+  if (!MONGODB_URI) console.error('→ Ajoute MONGODB_URI (et APP_PASSWORD) dans le fichier .env');
 });
 
 // Sur Vercel, une requête peut arriver avant la fin de la connexion
