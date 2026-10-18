@@ -1,10 +1,11 @@
 // Service worker MoggTrack : l'appli s'ouvre même hors connexion,
 // avec les dernières données consultées.
-const SHELL_CACHE = 'moggtrack-shell-v1';
+const SHELL_CACHE = 'moggtrack-shell-v2';
 const API_CACHE = 'moggtrack-api';
 const FONT_CACHE = 'moggtrack-fonts';
 const SHELL = [
   '/',
+  '/main.js',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
