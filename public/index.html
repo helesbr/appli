@@ -442,6 +442,7 @@
     .rt-btn { height: 42px; min-width: 50px; padding: 0 10px; border-radius: 12px; background: var(--surface-3); border: 1px solid var(--border-strong); font-size: 0.85rem; font-weight: 700; transition: transform .12s; }
     .rt-btn:active { transform: scale(0.94); }
     .rt-skip { background: var(--violet-soft); color: var(--violet); border-color: var(--violet-line); }
+    .rt-btn[hidden] { display: none; }
     .rest-timer.finished { background: var(--accent); border-top-color: var(--accent); }
     .rest-timer.finished .rt-label, .rest-timer.finished .rt-time { color: var(--accent-ink); }
     .rest-timer.finished .rt-bar { display: none; }
@@ -595,7 +596,7 @@
     .sets-table th:first-child { width: 40px; }
     .sets-table th:last-child { width: 40px; }
     .sets-table td { padding: 0 4px; text-align: center; }
-    .modal .sets-table input[type=number] { height: 40px; text-align: center; font-weight: 600; padding: 0 6px; }
+    .modal .sets-table input[type=number], .modal .sets-table input.set-weight { height: 40px; text-align: center; font-weight: 600; padding: 0 6px; }
     .set-idx {
       display: inline-grid; place-items: center;
       width: 28px; height: 28px; border-radius: 8px;
@@ -921,6 +922,7 @@
           <span class="rt-label" id="rtLabel">Repos</span>
           <span class="rt-time" id="rtTime">0:00</span>
         </div>
+        <button class="rt-btn" id="rtNotif" aria-label="Activer la notification de fin de repos" hidden>Notif</button>
         <button class="rt-btn" id="rtMinus" aria-label="Retirer 15 secondes">−15</button>
         <button class="rt-btn" id="rtPlus" aria-label="Ajouter 15 secondes">+15</button>
         <button class="rt-btn rt-skip" id="rtSkip">Passer</button>

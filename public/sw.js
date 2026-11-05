@@ -1,6 +1,6 @@
 // Service worker MoggTrack : l'appli s'ouvre même hors connexion,
 // avec les dernières données consultées.
-const SHELL_CACHE = 'moggtrack-shell-v2';
+const SHELL_CACHE = 'moggtrack-shell-v3';
 const API_CACHE = 'moggtrack-api';
 const FONT_CACHE = 'moggtrack-fonts';
 const SHELL = [
@@ -24,6 +24,29 @@ self.addEventListener('activate', event => {
       .then(keys => Promise.all(keys.filter(k => !keep.includes(k)).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+// --- FIN DE REPOS ---
+// Envoyée par le serveur. On affiche toujours la notification : Safari retire
+// l'abonnement aux applis qui reçoivent des push sans rien montrer.
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) {}
+  event.waitUntil(self.registration.showNotification(data.title || 'Repos terminé', {
+    body: data.body || 'C\'est reparti !',
+    tag: 'rest-timer',
+    icon: '/icons/icon-192.png',
+    vibrate: [200, 100, 200]
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (windows.length) return windows[0].focus();
+    return self.clients.openWindow('/');
+  })());
 });
 
 // Réseau d'abord (pour avoir les données à jour), cache en secours

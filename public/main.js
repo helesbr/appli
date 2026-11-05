@@ -19,7 +19,7 @@ async function api(url, opts = {}) {
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   let res;
   try {
-    res = await fetch(url, { method: opts.method || 'GET', headers, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
+    res = await fetch(url, { method: opts.method || 'GET', headers, keepalive: !!opts.keepalive, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
   } catch (e) {
     throw new Error('Pas de connexion : réessaie quand tu seras en ligne');
   }
@@ -44,6 +44,7 @@ function startApp() {
   document.getElementById('loginScreen').hidden = true;
   loadSessions();
   loadTemplates();
+  loadPushKey().catch(() => {});
   if (!pollTimer) pollTimer = setInterval(() => { if (!document.hidden) loadSessions().catch(() => {}); }, 5000);
 }
 function showLogin(message) {
@@ -357,10 +358,29 @@ function addBlockUI(type, exercises) {
   document.getElementById('blockList').appendChild(wrapper);
 }
 
+// Poids : toujours avec un point (règle anglaise), même si le clavier propose une virgule
+function normalizeWeight(v) {
+  return String(v ?? '').trim().replace(',', '.').replace(/\.$/, '');
+}
+// Pendant la saisie : la virgule devient un point ; chiffres et un seul point uniquement
+function cleanWeightTyping(v) {
+  const kept = v.replace(/,/g, '.').replace(/[^\d.]/g, '');
+  const sep = kept.indexOf('.');
+  if (sep < 0) return kept;
+  return kept.slice(0, sep + 1) + kept.slice(sep + 1).replace(/\./g, '');
+}
+// En phase de capture : le champ est nettoyé avant que la séance ne lise sa valeur
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (!el.matches || !el.matches('.set-weight, [data-field="weight"]')) return;
+  const cleaned = cleanWeightTyping(el.value);
+  if (cleaned !== el.value) el.value = cleaned;
+}, true);
+
 function setRowHTML(i, s) {
   return `<td><span class="set-idx">${i}</span></td>
     <td><input type="number" class="set-reps" inputmode="numeric" value="${s?escapeHtml(blankZero(s.reps)):''}" min="0" max="9999" placeholder="${s&&s.target?escapeHtml(s.target):'0'}"></td>
-    <td><input type="number" class="set-weight" inputmode="decimal" value="${s?escapeHtml(blankZero(s.weight)):''}" min="0" max="9999" step="0.5" placeholder="0"></td>
+    <td><input type="text" class="set-weight" inputmode="decimal" autocomplete="off" value="${s?escapeHtml(blankZero(s.weight)):''}" placeholder="0" aria-label="Charge en kg"></td>
     <td><button class="icon-btn danger remove-set" aria-label="Supprimer la série">${icon('x','ic-sm')}</button></td>`;
 }
 
@@ -385,7 +405,7 @@ function addExoToBlock(wrapper, ex) {
   div.querySelector('.add-set').onclick = () => {
     const tbody=div.querySelector('tbody'); const idx=tbody.rows.length+1;
     const last = tbody.rows[tbody.rows.length-1];
-    const prev = last ? { reps: last.querySelector('.set-reps').value, weight: last.querySelector('.set-weight').value, target: last.dataset.target } : null;
+    const prev = last ? { reps: last.querySelector('.set-reps').value, weight: normalizeWeight(last.querySelector('.set-weight').value), target: last.dataset.target } : null;
     const tr=document.createElement('tr');
     tr.dataset.target = prev && prev.target || '';
     tr.innerHTML=setRowHTML(idx, prev);
@@ -415,7 +435,7 @@ function collectSessionForm() {
       const sets = [];
       block.querySelectorAll('tbody tr').forEach(tr => {
         const reps=tr.querySelector('.set-reps').value;
-        const weight=tr.querySelector('.set-weight').value;
+        const weight=normalizeWeight(tr.querySelector('.set-weight').value);
         sets.push({reps, weight, target: tr.dataset.target || '', done: tr.dataset.done === '1'});
       });
       const rest = parseInt(block.querySelector('.exo-rest').value) || 0;
@@ -535,7 +555,7 @@ function renderWorkout() {
             <span class="set-idx">${si + 1}</span>
             <span class="wk-target">${st.target ? escapeHtml(st.target) : '–'}</span>
             <input type="number" inputmode="numeric" data-field="reps" min="0" max="9999" value="${escapeHtml(blankZero(st.reps))}" placeholder="${escapeHtml(st.target || '0')}" aria-label="Reps">
-            <input type="number" inputmode="decimal" step="0.5" min="0" max="9999" data-field="weight" value="${escapeHtml(blankZero(st.weight))}" placeholder="${escapeHtml(last && last.sets[si] ? blankZero(last.sets[si].weight) || '0' : '0')}" aria-label="Charge en kg">
+            <input type="text" inputmode="decimal" autocomplete="off" data-field="weight" value="${escapeHtml(blankZero(st.weight))}" placeholder="${escapeHtml(last && last.sets[si] ? blankZero(last.sets[si].weight) || '0' : '0')}" aria-label="Charge en kg">
             <button class="wk-check" data-act="check" aria-label="Valider la série">${icon('check')}</button>
             <button class="icon-btn danger wk-del" data-act="del-set" aria-label="Supprimer la série">${icon('x','ic-sm')}</button>
           </div>`).join('')}
@@ -599,7 +619,7 @@ wkBody.addEventListener('input', e => {
   if (!field || !workout) return;
   const t = wkLocate(e.target);
   if (field === 'name') t.ex.name = e.target.value;
-  else t.set[field] = e.target.value;
+  else t.set[field] = field === 'weight' ? normalizeWeight(e.target.value) : e.target.value;
   scheduleWorkoutSave();
 });
 wkBody.addEventListener('click', e => {
@@ -672,13 +692,139 @@ function fmtClock(sec) {
   sec = Math.max(0, Math.ceil(sec));
   return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 }
+
+// --- NOTIFICATION DE FIN DE REPOS ---
+// iOS met l'appli en pause en arrière-plan : c'est le serveur qui envoie la notification (Web Push)
+const NOTIF_ASKED_KEY = 'moggtrack-notif-asked';
+const REST_NOTIF_TAG = 'rest-timer';
+let pushKey = null;
+let pushErrorShown = false;
+
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+function restNotifAllowed() {
+  return 'Notification' in window && Notification.permission === 'granted';
+}
+function swRegistration() {
+  if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+  return navigator.serviceWorker.getRegistration().catch(() => null);
+}
+async function loadPushKey() {
+  if (!pushKey) pushKey = (await api('/api/push-key')).key;
+  return pushKey;
+}
+function base64UrlToBytes(value) {
+  const b64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+async function getPushSubscription(create) {
+  const reg = await swRegistration();
+  if (!reg || !reg.pushManager) return null;
+  const existing = await reg.pushManager.getSubscription();
+  if (existing || !create) return existing;
+  return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(await loadPushKey()) });
+}
+// Le bouton Notif reste visible tant que ce téléphone n'est pas abonné
+async function updateRestBell() {
+  const bell = document.getElementById('rtNotif');
+  let active = false;
+  try { active = pushSupported() && restNotifAllowed() && !!(await getPushSubscription(false)); } catch (e) {}
+  bell.hidden = active;
+}
+// Doit partir d'un geste de l'utilisateur (obligatoire sur iPhone)
+async function enableRestPush() {
+  if (!pushSupported()) {
+    toast('Sur iPhone : ajoute l\'appli à l\'écran d\'accueil et ouvre-la depuis son icône', 'error');
+    return;
+  }
+  try {
+    const result = await Notification.requestPermission();
+    if (result === 'denied') {
+      toast('Notifications bloquées : autorise-les dans les réglages du téléphone', 'error');
+      return;
+    }
+    if (result !== 'granted') return;
+    if (!(await getPushSubscription(true))) throw new Error('rouvre l\'appli puis réessaie');
+    toast('Notification de fin de repos activée');
+    updateRestBell();
+    if (rest && !rest.finished) armRestNotification();
+  } catch (e) {
+    toast('Notification impossible : ' + e.message, 'error');
+  }
+}
+// Proposé une seule fois au premier repos ; ensuite, le bouton Notif reste disponible
+function askRestNotifications() {
+  try {
+    if (localStorage.getItem(NOTIF_ASKED_KEY)) return;
+    localStorage.setItem(NOTIF_ASKED_KEY, '1');
+  } catch (e) { return; }
+  if (!pushSupported() || Notification.permission === 'default') enableRestPush();
+}
+function showPushError(e) {
+  console.warn('Notification de repos :', e);
+  if (pushErrorShown || (e && e.silent)) return;
+  pushErrorShown = true;
+  toast('Notification de repos indisponible : ' + e.message, 'error');
+}
+// Programme la notification sur le serveur. Les requêtes s'enchaînent pour que
+// +15 / -15 remplacent bien la précédente, même si elle n'a pas encore répondu.
+function armRestNotification() {
+  if (!rest || !pushSupported() || !restNotifAllowed()) return;
+  const current = rest, previous = current.pushReq;
+  current.pushReq = (async () => {
+    const replaces = previous ? await previous : null;
+    const sub = await getPushSubscription(true);
+    if (!sub) return null;
+    const seconds = Math.max(1, Math.ceil((current.endAt - Date.now()) / 1000));
+    const res = await api('/api/rest-timer', {
+      method: 'POST',
+      keepalive: true,
+      body: { seconds, label: current.label || '', subscription: sub.toJSON(), replaces }
+    });
+    return res.id;
+  })().catch(e => { showPushError(e); return null; });
+}
+function cancelRestNotification() {
+  const pending = rest && rest.pushReq;
+  if (!pending) return;
+  pending.then(id => {
+    if (id) return api('/api/rest-timer/' + id, { method: 'DELETE', keepalive: true });
+  }).catch(() => {});
+}
+async function closeRestNotification() {
+  const reg = await swRegistration();
+  if (!reg || !reg.getNotifications) return;
+  const shown = await reg.getNotifications({ tag: REST_NOTIF_TAG }).catch(() => []);
+  shown.forEach(n => n.close());
+}
+// Filet de sécurité (ordinateur, Android) : même tag que le serveur, donc pas de doublon
+async function showRestNotification(label) {
+  if (!restNotifAllowed()) return;
+  const options = {
+    body: (label ? label + ' : ' : '') + 'c\'est reparti !',
+    tag: REST_NOTIF_TAG,
+    icon: '/icons/icon-192.png',
+    vibrate: [200, 100, 200]
+  };
+  try {
+    const reg = await swRegistration();
+    if (reg) await reg.showNotification('Repos terminé', options);
+    else new Notification('Repos terminé', options);
+  } catch (e) {}
+}
+
 function startRest(seconds, label) {
   stopRest();
+  closeRestNotification().catch(() => {});
+  askRestNotifications();
   rest = { endAt: Date.now() + seconds * 1000, total: seconds, label, finished: false };
   document.getElementById('rtLabel').textContent = 'Repos · ' + (label || 'exercice');
   restEl.classList.remove('finished');
   restEl.hidden = false;
   rest.timer = setInterval(tickRest, 250);
+  updateRestBell();
+  armRestNotification();
   tickRest();
 }
 // Calculé à partir de l'heure de fin : reste juste même si le téléphone met l'appli en pause
@@ -693,12 +839,19 @@ function tickRest() {
     document.getElementById('rtLabel').textContent = 'Repos terminé · c\'est reparti !';
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     beep();
+    if (document.hidden) showRestNotification(rest.label);
     const ended = rest;
-    setTimeout(() => { if (rest === ended) stopRest(); }, 6000);
+    setTimeout(() => {
+      if (rest === ended) stopRest();
+      if (!document.hidden) closeRestNotification().catch(() => {});
+    }, 6000);
   }
 }
 function stopRest() {
-  if (rest) clearInterval(rest.timer);
+  if (rest) {
+    clearInterval(rest.timer);
+    if (!rest.finished) cancelRestNotification();
+  }
   rest = null;
   restEl.hidden = true;
 }
@@ -710,11 +863,13 @@ function adjustRest(delta) {
   }
   rest.endAt += delta * 1000;
   rest.total = Math.max(rest.total, (rest.endAt - Date.now()) / 1000);
+  armRestNotification();
   tickRest();
 }
 document.getElementById('rtMinus').onclick = () => adjustRest(-15);
 document.getElementById('rtPlus').onclick = () => adjustRest(15);
 document.getElementById('rtSkip').onclick = stopRest;
+document.getElementById('rtNotif').onclick = enableRestPush;
 
 // Garde l'écran allumé pendant la séance (si le navigateur le permet)
 async function keepAwake() {
@@ -726,6 +881,7 @@ function releaseAwake() {
   wakeLock = null;
 }
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') closeRestNotification().catch(() => {});
   if (document.visibilityState === 'visible' && workout) { keepAwake(); tickRest(); }
 });
 
