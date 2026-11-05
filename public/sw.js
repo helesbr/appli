@@ -1,11 +1,23 @@
 // Service worker MoggTrack : l'appli s'ouvre même hors connexion,
 // avec les dernières données consultées.
-const SHELL_CACHE = 'moggtrack-shell-v3';
+const SHELL_CACHE = 'moggtrack-shell-v4';
 const API_CACHE = 'moggtrack-api';
 const FONT_CACHE = 'moggtrack-fonts';
 const SHELL = [
   '/',
-  '/main.js',
+  '/js/logic.js',
+  '/js/core.js',
+  '/js/outbox.js',
+  '/js/suggestions.js',
+  '/js/auth.js',
+  '/js/rest-timer.js',
+  '/js/calendar.js',
+  '/js/session-form.js',
+  '/js/workout.js',
+  '/js/templates.js',
+  '/js/perfs.js',
+  '/js/settings.js',
+  '/js/app.js',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -84,7 +96,8 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(request, API_CACHE));
+    // Seules les données utiles hors connexion sont gardées ; export, appareils et état restent en direct
+    if (/^\/api\/(sessions|templates|top-perfs)/.test(url.pathname)) event.respondWith(networkFirst(request, API_CACHE));
   } else if (request.mode === 'navigate') {
     event.respondWith(networkFirst(new Request('/'), SHELL_CACHE));
   } else {
