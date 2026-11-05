@@ -198,6 +198,29 @@ test('modifier une séance conserve la semaine type d\'origine', async () => {
   assert.strictEqual(updated.completed, true);
 });
 
+test('les notes sont gardées sur les séances, les semaines types et à l\'application', async () => {
+  const token = await login();
+  const id = crypto.randomUUID();
+  const saved = await (await call('PUT', `/api/sessions/${id}`, { token, body: { date: '2026-06-01', name: 'S', blocks: [{ type: 'single', exercises: [{ name: 'Presse', note: '  Siège cran 4  ', sets: [] }] }] } })).json();
+  assert.strictEqual(saved.blocks[0].exercises[0].note, 'Siège cran 4');
+
+  const long = await (await call('PUT', `/api/sessions/${id}`, { token, body: { date: '2026-06-01', name: 'S', blocks: [{ type: 'single', exercises: [{ name: 'Presse', note: 'x'.repeat(600), sets: [] }] }] } })).json();
+  assert.strictEqual(long.blocks[0].exercises[0].note.length, 500);
+
+  const tpl = await (await call('PUT', `/api/templates/${crypto.randomUUID()}`, { token, body: { name: 'T', sessions: [{ name: 'A', dayOfWeek: 1, blocks: [{ type: 'single', exercises: [{ name: 'Presse', setsCount: 1, note: 'Pieds hauts' }] }] }] } })).json();
+  assert.strictEqual(tpl.sessions[0].blocks[0].exercises[0].note, 'Pieds hauts');
+  const applied = await (await call('POST', `/api/templates/${tpl.id}/apply`, { token, body: { weekStart: '2026-06-01' } })).json();
+  assert.strictEqual(applied.sessions[0].blocks[0].exercises[0].note, 'Pieds hauts');
+});
+
+test('une séance dupliquée garde sa semaine type', async () => {
+  const token = await login();
+  const res = await call('PUT', `/api/sessions/${crypto.randomUUID()}`, { token, body: { date: '2026-06-08', name: 'Copie', blocks: [], completed: false, templateName: 'Force', weekType: 'Lourd' } });
+  const saved = await res.json();
+  assert.strictEqual(saved.templateName, 'Force');
+  assert.strictEqual(saved.weekType, 'Lourd');
+});
+
 test('modification invalide : refusée sans créer de séance', async () => {
   const token = await login();
   const id = crypto.randomUUID();
@@ -244,7 +267,7 @@ test('export JSON complet et CSV lisible, sans formule exécutable', async () =>
   assert.strictEqual(buffer.subarray(0, 3).toString('hex'), 'efbbbf');
   const text = buffer.toString('utf8');
   const line = text.split('\r\n').find(l => l.includes('poulie'));
-  assert.strictEqual(line, `2026-05-01;'=HACK();non;simple;"Tirage; poulie";60;1;10;10;50.5;oui`);
+  assert.strictEqual(line, `2026-05-01;'=HACK();non;simple;"Tirage; poulie";60;1;10;10;50.5;oui;`);
 });
 
 test('notification : programmée via QStash, envoyée une fois, annulable et remplaçable', async () => {

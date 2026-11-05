@@ -56,6 +56,7 @@ function renderWorkout() {
     (block.exercises||[]).forEach((ex, ei) => {
       ex.sets = ex.sets || [];
       const last = lastPerformance(ex.name, w.date, w.id);
+      const lastNote = lastExerciseNote(sessions, ex.name, w.date, w.id);
       const isFirst = bi === 0 && ei === 0;
       const isLast = bi === w.blocks.length - 1 && ei === block.exercises.length - 1;
       const card = document.createElement('div');
@@ -70,6 +71,8 @@ function renderWorkout() {
           <button class="icon-btn danger" data-act="del-exo" aria-label="Retirer l'exercice">${icon('trash','ic-sm')}</button>
         </div>
         ${last ? `<div class="wk-last">${icon('history')}<span>Dernière fois (${frDate(last.date).slice(0,5)}) : ${last.sets.map(st => `<b>${escapeHtml(blankZero(st.weight)||0)}</b> kg × ${escapeHtml(blankZero(st.reps)||0)}`).join(' · ')}</span></div>` : ''}
+        ${lastNote && lastNote.note !== String(ex.note || '').trim() ? `<div class="wk-last wk-last-note">${icon('note')}<span>Note du ${frDate(lastNote.date).slice(0,5)} : ${escapeHtml(lastNote.note)}</span></div>` : ''}
+        <textarea class="note-input" data-field="note" rows="1" maxlength="500" placeholder="Ajouter une note (réglage, sensation…)" aria-label="Note sur l'exercice">${escapeHtml(ex.note || '')}</textarea>
         <div class="wk-sets-head"><span>#</span><span>Obj.</span><span>Reps</span><span>Kg</span><span>OK</span><span></span></div>
         ${ex.sets.map((st, si) => `
           <div class="wk-set${st.done ? ' done' : ''}" data-s="${si}">
@@ -149,7 +152,7 @@ wkBody.addEventListener('input', e => {
   const field = e.target.dataset.field;
   if (!field || !workout) return;
   const t = wkLocate(e.target);
-  if (field === 'name') t.ex.name = e.target.value;
+  if (field === 'name' || field === 'note') t.ex[field] = e.target.value;
   else t.set[field] = field === 'weight' ? normalizeWeight(e.target.value) : e.target.value;
   saveWorkout();
 });

@@ -67,6 +67,61 @@ test('déplacer un exercice : dans le superset, sinon avec le bloc voisin', () =
   assert.strictEqual(names(b), 'A,B+C,D');
 });
 
+test('la note rappelée est la plus récente, sans regarder cette séance ni le futur', () => {
+  const session = (id, date, note, name = 'Développé couché') => ({ id, date, blocks: [{ exercises: [{ name, note }] }] });
+  const sessions = [
+    session('a', '2026-01-01', 'Ancienne'),
+    session('b', '2026-01-08', 'Récente'),
+    session('c', '2026-01-15', ''),
+    session('d', '2026-01-20', 'Futur'),
+    session('e', '2026-01-09', 'Autre exercice', 'Squat')
+  ];
+  assert.deepStrictEqual(logic.lastExerciseNote(sessions, 'developpe couche', '2026-01-15', 'c'), { date: '2026-01-08', note: 'Récente' });
+  assert.strictEqual(logic.lastExerciseNote(sessions, 'Dips', '2026-01-15', 'c'), null);
+  assert.strictEqual(logic.lastExerciseNote(sessions, '', '2026-01-15', 'c'), null);
+});
+
+test('addDaysIso passe les mois et les changements d\'heure', () => {
+  assert.strictEqual(logic.addDaysIso('2026-01-28', 7), '2026-02-04');
+  assert.strictEqual(logic.addDaysIso('2026-03-28', 7), '2026-04-04');
+  assert.strictEqual(logic.addDaysIso('2026-03-02', -1), '2026-03-01');
+});
+
+test('dupliquer une séance garde le plan et les notes, et vide les résultats', () => {
+  const source = {
+    id: 'a', date: '2026-01-05', name: 'Push', completed: true, templateName: 'Force', weekType: 'Lourd',
+    blocks: [{ type: 'superset', exercises: [{ name: 'Dips', rest: 60, note: 'Lesté', sets: [
+      { reps: '10', weight: '20', target: '8', done: true },
+      { reps: '12', weight: '20', target: '', done: true },
+      { reps: '', weight: '', target: '', done: false }
+    ] }] }]
+  };
+  const copy = logic.duplicateSession(source, '2026-01-12');
+  assert.strictEqual(copy.id, undefined);
+  assert.strictEqual(copy.date, '2026-01-12');
+  assert.strictEqual(copy.completed, false);
+  assert.strictEqual(copy.templateName, 'Force');
+  assert.strictEqual(copy.blocks[0].type, 'superset');
+  const ex = copy.blocks[0].exercises[0];
+  assert.strictEqual(ex.note, 'Lesté');
+  assert.strictEqual(ex.rest, 60);
+  assert.deepStrictEqual(ex.sets, [
+    { reps: '', weight: '', target: '8', done: false },
+    { reps: '', weight: '', target: '12', done: false },
+    { reps: '', weight: '', target: '', done: false }
+  ]);
+  assert.strictEqual(source.blocks[0].exercises[0].sets[0].weight, '20');
+});
+
+test('dupliquer une semaine type crée une copie indépendante', () => {
+  const tpl = { id: 'a', name: 'Force', weekType: 'Lourd', sessions: [{ name: 'A', dayOfWeek: 1, blocks: [] }] };
+  const copy = logic.duplicateTemplate(tpl);
+  assert.strictEqual(copy.name, 'Force (copie)');
+  assert.strictEqual(copy.id, undefined);
+  copy.sessions[0].name = 'Modifiée';
+  assert.strictEqual(tpl.sessions[0].name, 'A');
+});
+
 test('la file d\'attente ne garde que la dernière version d\'une fiche', () => {
   let items = logic.upsertOutboxItem([], { kind: 'sessions', id: 'a', op: 'save', rev: 1 });
   items = logic.upsertOutboxItem(items, { kind: 'sessions', id: 'b', op: 'save', rev: 2 });

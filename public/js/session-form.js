@@ -6,6 +6,7 @@ function openNewSession(date) {
   document.getElementById('sessionName').value = '';
   document.getElementById('blockList').innerHTML = '';
   document.getElementById('deleteSessionBtn').hidden = true;
+  document.getElementById('duplicateSessionBtn').hidden = true;
   addBlockUI('single');
   openModal('sessionModal');
 }
@@ -18,6 +19,7 @@ function openEditSession(id) {
   document.getElementById('sessionName').value = session.name;
   document.getElementById('blockList').innerHTML = '';
   document.getElementById('deleteSessionBtn').hidden = false;
+  document.getElementById('duplicateSessionBtn').hidden = false;
   (session.blocks||[]).forEach(b => addBlockUI(b.type, b.exercises));
   openModal('sessionModal');
 }
@@ -109,6 +111,7 @@ function addExoToBlock(wrapper, ex) {
       <tbody>${sets.map((s,i)=>`<tr data-target="${escapeHtml(s.target||'')}" data-done="${s.done?'1':''}">${setRowHTML(i+1, s)}</tr>`).join('')}</tbody>
     </table>
     <button class="btn btn-ghost btn-sm add-set">${icon('plus','ic-sm')}Série</button>
+    <textarea class="note-input exo-note" rows="1" maxlength="500" placeholder="Ajouter une note (réglage, sensation…)" aria-label="Note sur l'exercice">${ex&&ex.note?escapeHtml(ex.note):''}</textarea>
   `;
   div.querySelector('.remove-exo').onclick = () => removeExoFrom(div, container);
   bindMoveButtons(div);
@@ -149,7 +152,8 @@ function collectSessionForm() {
         sets.push({reps, weight, target: tr.dataset.target || '', done: tr.dataset.done === '1'});
       });
       const rest = parseInt(block.querySelector('.exo-rest').value) || 0;
-      exercises.push({name:exName, sets, rest});
+      const note = block.querySelector('.exo-note').value.trim();
+      exercises.push({name:exName, sets, rest, note});
     });
     if (exercises.length>0) blocks.push({type, exercises});
   });

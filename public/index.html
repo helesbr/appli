@@ -365,6 +365,9 @@
     .chip-play { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 16px rgba(200,245,59,0.25); transition: transform .12s; }
     .chip-play:active { transform: scale(0.92); }
     .chip-play .ic { fill: currentColor; }
+    .chip-copy { width: 38px; height: 38px; margin-right: -4px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; color: var(--muted); transition: background .2s, color .2s; }
+    .chip-copy:hover { background: var(--surface-3); color: var(--text); }
+    .session-dot .s-info { flex: 1; }
     .s-done { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); }
     .session-dot.completed .s-name::before { background: var(--subtle); box-shadow: none; }
     /* Statut lisible sans la couleur : le texte « Terminée » / « Manquée » l'accompagne */
@@ -415,6 +418,20 @@
     .block-wrapper.superset .wk-last { background: var(--surface-3); }
     .wk-last .ic { width: 14px; height: 14px; margin-top: 1px; color: var(--violet); }
     .wk-last b { color: var(--text); font-weight: 600; }
+    .note-input {
+      display: block; width: 100%; min-height: 40px; margin-top: 8px; padding: 9px 12px; resize: none; field-sizing: content;
+      border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--text);
+      font: inherit; font-size: 16px; line-height: 1.3; outline: none; transition: border-color .2s;
+    }
+    .note-input:focus { border-color: var(--accent); }
+    .note-input::placeholder { color: var(--subtle); }
+    .wk-last-note .ic { color: var(--accent); }
+    .detail-note { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .dup-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 14px; }
+    .dup-days button { min-height: 52px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--muted); }
+    .dup-days button b { font-family: var(--font-display); font-size: 1.05rem; color: var(--text); }
+    .dup-days button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .dup-days button.active b { color: var(--accent-ink); }
     .wk-sets-head, .wk-set { display: grid; grid-template-columns: 28px 38px 1fr 1fr 44px 28px; gap: 6px; align-items: center; }
     .wk-sets-head { margin: 12px 0 6px; font-size: 0.64rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); text-align: center; }
     .wk-set { margin-bottom: 6px; }
@@ -663,7 +680,13 @@
       padding: 12px;
       margin-bottom: 10px;
     }
-    .tpl-session-head { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .tpl-session-head { display: grid; grid-template-columns: 130px 1fr auto auto; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .modal .tpl-exo-row input.tpl-exo-note { flex: 1 1 100%; height: 40px; }
+    .tpl-copy { margin-left: auto; }
+    @media (max-width: 520px) {
+      .tpl-session-head { grid-template-columns: 1fr auto auto; }
+      .tpl-session-head .tpl-session-name { grid-column: 1 / -1; grid-row: 2; }
+    }
     .tpl-blocks .block-wrapper:not(.superset) { margin-bottom: 6px; }
     .tpl-exo-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
     .modal .tpl-exo-row input.tpl-exo-name { flex: 1 1 140px; min-width: 0; height: 40px; }
@@ -798,8 +821,6 @@
     }
 
     @media (max-width: 380px) {
-      .tpl-session-head { grid-template-columns: 1fr auto; }
-      .tpl-session-head .tpl-session-name { grid-column: 1 / -1; grid-row: 2; }
       .page-head h1 { font-size: 1.7rem; }
       .stat-value { font-size: 1.25rem; }
     }
@@ -831,6 +852,7 @@
     <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
     <symbol id="i-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
     <symbol id="i-logo" viewBox="0 0 24 24"><path d="M5 17V7l7 5 7-5v10"/></symbol>
   </svg>
 
@@ -1004,6 +1026,7 @@
       </div>
       <div class="modal-foot">
         <button class="icon-btn lg danger" id="deleteSessionBtn" aria-label="Supprimer" hidden><svg class="ic"><use href="#i-trash"/></svg></button>
+        <button class="icon-btn lg" id="duplicateSessionBtn" aria-label="Dupliquer la séance" hidden><svg class="ic"><use href="#i-copy"/></svg></button>
         <button class="btn btn-secondary" id="closeModalBtn">Annuler</button>
         <button class="btn btn-primary grow" id="saveSessionBtn"><svg class="ic"><use href="#i-check"/></svg>Sauvegarder</button>
       </div>
@@ -1085,6 +1108,32 @@
     </div>
   </div>
 
+  <!-- MODAL: Dupliquer une séance -->
+  <div class="modal-overlay" id="dupModal" data-dismiss>
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-head">
+        <div>
+          <h3>Dupliquer la séance</h3>
+          <p class="modal-sub" id="dupName"></p>
+        </div>
+        <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <p class="settings-note" style="margin-bottom:12px;">Exercices, séries et notes sont copiés. Les reps et les charges repartent à vide.</p>
+        <div class="dup-days" id="dupDays"></div>
+        <div class="form-row">
+          <label for="dupDate">Date</label>
+          <input type="date" id="dupDate">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" id="closeDupBtn">Annuler</button>
+        <button class="btn btn-primary grow" id="confirmDupBtn"><svg class="ic"><use href="#i-copy"/></svg>Dupliquer</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: Réglages -->
   <div class="modal-overlay" id="settingsModal" data-dismiss>
     <div class="modal">
@@ -1126,6 +1175,7 @@
   <script src="/js/rest-timer.js"></script>
   <script src="/js/calendar.js"></script>
   <script src="/js/session-form.js"></script>
+  <script src="/js/duplicate.js"></script>
   <script src="/js/workout.js"></script>
   <script src="/js/templates.js"></script>
   <script src="/js/perfs.js"></script>

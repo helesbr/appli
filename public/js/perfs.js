@@ -61,6 +61,7 @@ async function showSessionDetail(id) {
       const div = document.createElement('div');
       div.className = 'session-detail-exo';
       div.innerHTML = `<h4><span>${escapeHtml(ex.name)}</span>${ex.rest?`<span class="rest-pill">${icon('timer')}${escapeHtml(ex.rest)}s</span>`:''}</h4>
+        ${ex.note?`<p class="detail-note">${escapeHtml(ex.note)}</p>`:''}
         <table><thead><tr><th>Série</th><th>Reps</th><th>Poids</th></tr></thead>
         <tbody>${(ex.sets||[]).map((set,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(set.reps)}</td><td>${escapeHtml(set.weight)} kg</td></tr>`).join('')}</tbody></table>`;
       bDiv.appendChild(div);

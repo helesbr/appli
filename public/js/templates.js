@@ -6,7 +6,7 @@ async function loadTemplates() {
   renderTemplates();
 }
 
-function templateCardHTML(tpl) {
+function templateCardHTML(tpl, withCopy) {
   const days = new Set(tpl.sessions.map(s=>s.dayOfWeek));
   const strip = DAYS_LETTER.map((l,i)=>`<span class="${days.has(i+1)?'on':''}">${l}</span>`).join('');
   const sessionsInfo = [...tpl.sessions].sort((a,b)=>a.dayOfWeek-b.dayOfWeek)
@@ -15,6 +15,7 @@ function templateCardHTML(tpl) {
     <div class="tpl-card-header">
       <span class="tpl-card-name">${escapeHtml(tpl.name)}</span>
       ${tpl.weekType ? `<span class="tpl-card-type">${escapeHtml(tpl.weekType)}</span>` : ''}
+      ${withCopy ? `<button class="icon-btn tpl-copy" aria-label="Dupliquer ${escapeHtml(tpl.name)}">${icon('copy','ic-sm')}</button>` : ''}
     </div>
     <div class="week-strip">${strip}</div>
     <div class="tpl-card-sessions">${sessionsInfo||'Aucune séance'}</div>`;
@@ -30,8 +31,15 @@ function renderTemplates() {
     div.className = 'tpl-card card';
     div.setAttribute('role', 'button');
     div.tabIndex = 0;
-    div.innerHTML = templateCardHTML(tpl);
+    div.innerHTML = templateCardHTML(tpl, true);
     div.onclick = () => openEditTemplate(tpl.id);
+    div.querySelector('.tpl-copy').onclick = e => {
+      e.stopPropagation();
+      const id = newId();
+      const copy = duplicateTemplate(tpl);
+      saveRecord('templates', id, copy);
+      undoToast(`« ${copy.name} » créé`, () => deleteRecord('templates', id));
+    };
     list.appendChild(div);
   });
 }
@@ -73,6 +81,7 @@ function addTplSessionUI(s) {
     <div class="tpl-session-head">
       <select class="tpl-day">${dayOptions}</select>
       <input type="text" class="tpl-session-name" placeholder="Push, Pull…" value="${s?escapeHtml(s.name):''}" maxlength="200">
+      <button class="icon-btn lg copy-tpl-session" aria-label="Dupliquer la séance">${icon('copy','ic-sm')}</button>
       <button class="icon-btn lg danger remove-tpl-session" aria-label="Supprimer la séance">${icon('trash','ic-sm')}</button>
     </div>
     <div class="tpl-blocks"></div>
@@ -82,6 +91,13 @@ function addTplSessionUI(s) {
     </div>
   `;
   div.querySelector('.remove-tpl-session').onclick = () => div.remove();
+  // La copie arrive juste en dessous, sur le jour suivant
+  div.querySelector('.copy-tpl-session').onclick = () => {
+    const source = readTplSession(div);
+    const copy = addTplSessionUI({ ...source, dayOfWeek: Math.min(7, source.dayOfWeek + 1) });
+    div.insertAdjacentElement('afterend', copy);
+    copy.querySelector('.tpl-session-name').focus();
+  };
   div.querySelector('.add-tpl-single').onclick = () => addTplBlockUI(div.querySelector('.tpl-blocks'),'single');
   div.querySelector('.add-tpl-superset').onclick = () => addTplBlockUI(div.querySelector('.tpl-blocks'),'superset');
 
@@ -93,6 +109,7 @@ function addTplSessionUI(s) {
   }
 
   document.getElementById('tplSessionList').appendChild(div);
+  return div;
 }
 
 function addTplBlockUI(container, type, exercises) {
@@ -120,10 +137,34 @@ function addTplExoUI(container, ex) {
     <label class="unit-input" title="Reps visées (ex : 8 ou 8-10)"><span>×</span><input type="text" class="tpl-exo-reps" inputmode="numeric" placeholder="8" value="${ex&&ex.reps?escapeHtml(ex.reps):''}" maxlength="10"><span>reps</span></label>
     <label class="unit-input" title="Repos">${icon('timer')}<input type="number" class="tpl-exo-rest" inputmode="numeric" placeholder="–" value="${ex&&ex.rest?escapeHtml(ex.rest):''}" min="0" max="3600"><span>s</span></label>
     <button class="icon-btn danger remove-tpl-exo" aria-label="Supprimer l'exercice">${icon('x','ic-sm')}</button>
+    <input type="text" class="tpl-exo-note" maxlength="500" autocomplete="off" placeholder="Note (réglage, consigne…)" aria-label="Note sur l'exercice" value="${ex&&ex.note?escapeHtml(ex.note):''}">
   `;
   div.querySelector('.remove-tpl-exo').onclick = () => removeExoFrom(div, container);
   bindMoveButtons(div);
   container.appendChild(div);
+}
+
+// Lit une séance du formulaire ; elle garde tous ses exercices, même sans nom pour l'instant
+function readTplSession(sDiv) {
+  const blocks = [];
+  sDiv.querySelectorAll('.block-wrapper').forEach(bw => {
+    const type = bw.dataset.type;
+    const exercises = [];
+    bw.querySelectorAll('.tpl-exo-container > div').forEach(exDiv => {
+      const eName = exDiv.querySelector('.tpl-exo-name').value.trim();
+      const setsCount = parseInt(exDiv.querySelector('.tpl-exo-sets').value)||4;
+      const rest = parseInt(exDiv.querySelector('.tpl-exo-rest').value) || 0;
+      const reps = exDiv.querySelector('.tpl-exo-reps').value.trim();
+      const note = exDiv.querySelector('.tpl-exo-note').value.trim();
+      if (eName) exercises.push({name:eName, setsCount, reps, rest, note});
+    });
+    if (exercises.length>0) blocks.push({type, exercises});
+  });
+  return {
+    name: sDiv.querySelector('.tpl-session-name').value.trim(),
+    dayOfWeek: parseInt(sDiv.querySelector('.tpl-day').value),
+    blocks
+  };
 }
 
 document.getElementById('saveTplBtn').onclick = () => {
@@ -132,23 +173,8 @@ document.getElementById('saveTplBtn').onclick = () => {
   if (!name) return toast('Donne un nom au template', 'error');
   const tplSessions = [];
   document.querySelectorAll('#tplSessionList > div').forEach(sDiv => {
-    const sName = sDiv.querySelector('.tpl-session-name').value.trim();
-    const dayOfWeek = parseInt(sDiv.querySelector('.tpl-day').value);
-    if (!sName) return;
-    const blocks = [];
-    sDiv.querySelectorAll('.block-wrapper').forEach(bw => {
-      const type = bw.dataset.type;
-      const exercises = [];
-      bw.querySelectorAll('.tpl-exo-container > div').forEach(exDiv => {
-        const eName = exDiv.querySelector('.tpl-exo-name').value.trim();
-        const setsCount = parseInt(exDiv.querySelector('.tpl-exo-sets').value)||4;
-        const rest = parseInt(exDiv.querySelector('.tpl-exo-rest').value) || 0;
-        const reps = exDiv.querySelector('.tpl-exo-reps').value.trim();
-        if (eName) exercises.push({name:eName, setsCount, reps, rest});
-      });
-      if (exercises.length>0) blocks.push({type, exercises});
-    });
-    tplSessions.push({name:sName, dayOfWeek, blocks});
+    const session = readTplSession(sDiv);
+    if (session.name) tplSessions.push(session);
   });
   const body = {name, weekType, sessions:tplSessions};
   saveRecord('templates', editingTplId || newId(), body);

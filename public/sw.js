@@ -1,6 +1,6 @@
 // Service worker MoggTrack : l'appli s'ouvre même hors connexion,
 // avec les dernières données consultées.
-const SHELL_CACHE = 'moggtrack-shell-v4';
+const SHELL_CACHE = 'moggtrack-shell-v5';
 const API_CACHE = 'moggtrack-api';
 const FONT_CACHE = 'moggtrack-fonts';
 const SHELL = [
@@ -13,6 +13,7 @@ const SHELL = [
   '/js/rest-timer.js',
   '/js/calendar.js',
   '/js/session-form.js',
+  '/js/duplicate.js',
   '/js/workout.js',
   '/js/templates.js',
   '/js/perfs.js',
