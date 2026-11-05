@@ -357,10 +357,29 @@ function addBlockUI(type, exercises) {
   document.getElementById('blockList').appendChild(wrapper);
 }
 
+// Poids : accepte 82,5 et 82.5 ; toujours enregistré avec un point
+function normalizeWeight(v) {
+  return String(v ?? '').trim().replace(',', '.').replace(/\.$/, '');
+}
+// Garde uniquement des chiffres et un seul séparateur décimal pendant la saisie
+function cleanWeightTyping(v) {
+  const kept = v.replace(/[^\d.,]/g, '');
+  const sep = kept.search(/[.,]/);
+  if (sep < 0) return kept;
+  return kept.slice(0, sep + 1) + kept.slice(sep + 1).replace(/[.,]/g, '');
+}
+// En phase de capture : le champ est nettoyé avant que la séance ne lise sa valeur
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (!el.matches || !el.matches('.set-weight, [data-field="weight"]')) return;
+  const cleaned = cleanWeightTyping(el.value);
+  if (cleaned !== el.value) el.value = cleaned;
+}, true);
+
 function setRowHTML(i, s) {
   return `<td><span class="set-idx">${i}</span></td>
     <td><input type="number" class="set-reps" inputmode="numeric" value="${s?escapeHtml(blankZero(s.reps)):''}" min="0" max="9999" placeholder="${s&&s.target?escapeHtml(s.target):'0'}"></td>
-    <td><input type="number" class="set-weight" inputmode="decimal" value="${s?escapeHtml(blankZero(s.weight)):''}" min="0" max="9999" step="0.5" placeholder="0"></td>
+    <td><input type="text" class="set-weight" inputmode="decimal" autocomplete="off" value="${s?escapeHtml(blankZero(s.weight)):''}" placeholder="0" aria-label="Charge en kg"></td>
     <td><button class="icon-btn danger remove-set" aria-label="Supprimer la série">${icon('x','ic-sm')}</button></td>`;
 }
 
@@ -385,7 +404,7 @@ function addExoToBlock(wrapper, ex) {
   div.querySelector('.add-set').onclick = () => {
     const tbody=div.querySelector('tbody'); const idx=tbody.rows.length+1;
     const last = tbody.rows[tbody.rows.length-1];
-    const prev = last ? { reps: last.querySelector('.set-reps').value, weight: last.querySelector('.set-weight').value, target: last.dataset.target } : null;
+    const prev = last ? { reps: last.querySelector('.set-reps').value, weight: normalizeWeight(last.querySelector('.set-weight').value), target: last.dataset.target } : null;
     const tr=document.createElement('tr');
     tr.dataset.target = prev && prev.target || '';
     tr.innerHTML=setRowHTML(idx, prev);
@@ -415,7 +434,7 @@ function collectSessionForm() {
       const sets = [];
       block.querySelectorAll('tbody tr').forEach(tr => {
         const reps=tr.querySelector('.set-reps').value;
-        const weight=tr.querySelector('.set-weight').value;
+        const weight=normalizeWeight(tr.querySelector('.set-weight').value);
         sets.push({reps, weight, target: tr.dataset.target || '', done: tr.dataset.done === '1'});
       });
       const rest = parseInt(block.querySelector('.exo-rest').value) || 0;
@@ -535,7 +554,7 @@ function renderWorkout() {
             <span class="set-idx">${si + 1}</span>
             <span class="wk-target">${st.target ? escapeHtml(st.target) : '–'}</span>
             <input type="number" inputmode="numeric" data-field="reps" min="0" max="9999" value="${escapeHtml(blankZero(st.reps))}" placeholder="${escapeHtml(st.target || '0')}" aria-label="Reps">
-            <input type="number" inputmode="decimal" step="0.5" min="0" max="9999" data-field="weight" value="${escapeHtml(blankZero(st.weight))}" placeholder="${escapeHtml(last && last.sets[si] ? blankZero(last.sets[si].weight) || '0' : '0')}" aria-label="Charge en kg">
+            <input type="text" inputmode="decimal" autocomplete="off" data-field="weight" value="${escapeHtml(blankZero(st.weight))}" placeholder="${escapeHtml(last && last.sets[si] ? blankZero(last.sets[si].weight) || '0' : '0')}" aria-label="Charge en kg">
             <button class="wk-check" data-act="check" aria-label="Valider la série">${icon('check')}</button>
             <button class="icon-btn danger wk-del" data-act="del-set" aria-label="Supprimer la série">${icon('x','ic-sm')}</button>
           </div>`).join('')}
@@ -599,7 +618,7 @@ wkBody.addEventListener('input', e => {
   if (!field || !workout) return;
   const t = wkLocate(e.target);
   if (field === 'name') t.ex.name = e.target.value;
-  else t.set[field] = e.target.value;
+  else t.set[field] = field === 'weight' ? normalizeWeight(e.target.value) : e.target.value;
   scheduleWorkoutSave();
 });
 wkBody.addEventListener('click', e => {
@@ -672,13 +691,82 @@ function fmtClock(sec) {
   sec = Math.max(0, Math.ceil(sec));
   return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 }
+
+// --- NOTIFICATION DE FIN DE REPOS ---
+const NOTIF_ASKED_KEY = 'moggtrack-notif-asked';
+const REST_NOTIF_TAG = 'rest-timer';
+
+function restNotifAllowed() {
+  return 'Notification' in window && Notification.permission === 'granted';
+}
+function swRegistration() {
+  if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+  return navigator.serviceWorker.getRegistration().catch(() => null);
+}
+// Demandé une seule fois, pendant un geste de l'utilisateur (obligatoire sur iPhone)
+function askRestNotifications() {
+  try {
+    if (localStorage.getItem(NOTIF_ASKED_KEY)) return;
+    if (!('Notification' in window)) {
+      localStorage.setItem(NOTIF_ASKED_KEY, '1');
+      toast('Pour la notification de repos, ajoute l\'appli à ton écran d\'accueil');
+      return;
+    }
+    if (Notification.permission !== 'default') return;
+    localStorage.setItem(NOTIF_ASKED_KEY, '1');
+    Notification.requestPermission().then(result => {
+      if (result === 'granted') {
+        toast('Notification de fin de repos activée');
+        if (rest && !rest.finished) armRestNotification();
+      } else if (result === 'denied') {
+        toast('Notifications bloquées : autorise-les dans les réglages du navigateur', 'error');
+      }
+    }).catch(() => {});
+  } catch (e) {}
+}
+// Confie la fin du repos au service worker : il continue quand l'appli passe en arrière-plan
+async function armRestNotification() {
+  if (!rest || !restNotifAllowed()) return;
+  const { endAt, label } = rest;
+  const reg = await swRegistration();
+  if (reg && reg.active) reg.active.postMessage({ type: 'rest-start', endAt, label });
+}
+async function cancelRestNotification() {
+  const reg = await swRegistration();
+  if (reg && reg.active) reg.active.postMessage({ type: 'rest-cancel' });
+}
+async function closeRestNotification() {
+  const reg = await swRegistration();
+  if (!reg || !reg.getNotifications) return;
+  const shown = await reg.getNotifications({ tag: REST_NOTIF_TAG }).catch(() => []);
+  shown.forEach(n => n.close());
+}
+// Filet de sécurité si la page se réveille avant le service worker (même tag : pas de doublon)
+async function showRestNotification(label) {
+  if (!restNotifAllowed()) return;
+  const options = {
+    body: (label ? label + ' : ' : '') + 'c\'est reparti !',
+    tag: REST_NOTIF_TAG,
+    icon: '/icons/icon-192.png',
+    vibrate: [200, 100, 200]
+  };
+  try {
+    const reg = await swRegistration();
+    if (reg) await reg.showNotification('Repos terminé', options);
+    else new Notification('Repos terminé', options);
+  } catch (e) {}
+}
+
 function startRest(seconds, label) {
   stopRest();
+  closeRestNotification().catch(() => {});
+  askRestNotifications();
   rest = { endAt: Date.now() + seconds * 1000, total: seconds, label, finished: false };
   document.getElementById('rtLabel').textContent = 'Repos · ' + (label || 'exercice');
   restEl.classList.remove('finished');
   restEl.hidden = false;
   rest.timer = setInterval(tickRest, 250);
+  armRestNotification();
   tickRest();
 }
 // Calculé à partir de l'heure de fin : reste juste même si le téléphone met l'appli en pause
@@ -693,12 +781,16 @@ function tickRest() {
     document.getElementById('rtLabel').textContent = 'Repos terminé · c\'est reparti !';
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     beep();
+    if (document.hidden) showRestNotification(rest.label);
     const ended = rest;
     setTimeout(() => { if (rest === ended) stopRest(); }, 6000);
   }
 }
 function stopRest() {
-  if (rest) clearInterval(rest.timer);
+  if (rest) {
+    clearInterval(rest.timer);
+    if (!rest.finished) cancelRestNotification().catch(() => {});
+  }
   rest = null;
   restEl.hidden = true;
 }
@@ -710,6 +802,7 @@ function adjustRest(delta) {
   }
   rest.endAt += delta * 1000;
   rest.total = Math.max(rest.total, (rest.endAt - Date.now()) / 1000);
+  armRestNotification();
   tickRest();
 }
 document.getElementById('rtMinus').onclick = () => adjustRest(-15);
@@ -726,6 +819,7 @@ function releaseAwake() {
   wakeLock = null;
 }
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') closeRestNotification().catch(() => {});
   if (document.visibilityState === 'visible' && workout) { keepAwake(); tickRest(); }
 });
 

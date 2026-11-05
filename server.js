@@ -173,10 +173,11 @@ function toInt(v, min, max, fallback) {
   return Math.max(min, Math.min(max, n));
 }
 
-// Reps / poids : "" = série pas encore faite. On garde le type envoyé (texte ou nombre)
+// Reps / poids : "" = série pas encore faite. On garde le type envoyé (texte ou nombre).
+// La virgule est acceptée : sans ça, parseFloat('82,5') donnerait 82
 function cleanAmount(v, max) {
   if (v === '' || v == null) return '';
-  const n = parseFloat(v);
+  const n = parseFloat(String(v).replace(',', '.'));
   if (!Number.isFinite(n)) return '';
   const clamped = Math.max(0, Math.min(max, n));
   return typeof v === 'string' ? String(clamped) : clamped;

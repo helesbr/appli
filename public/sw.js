@@ -26,6 +26,57 @@ self.addEventListener('activate', event => {
   );
 });
 
+// --- FIN DE REPOS ---
+// Le minuteur tourne ici car la page peut être mise en pause en arrière-plan.
+// waitUntil garde le service worker en vie jusqu'à la fin du repos.
+let restTimeout = null;
+let restRelease = null;
+
+function clearRest() {
+  clearTimeout(restTimeout);
+  restTimeout = null;
+  if (restRelease) restRelease();
+  restRelease = null;
+}
+
+async function notifyRestEnd(label) {
+  // Page visible : le minuteur à l'écran, le son et la vibration suffisent
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  if (windows.some(c => c.visibilityState === 'visible')) return;
+  await self.registration.showNotification('Repos terminé', {
+    body: (label ? label + ' : ' : '') + 'c\'est reparti !',
+    tag: 'rest-timer',
+    icon: '/icons/icon-192.png',
+    vibrate: [200, 100, 200]
+  });
+}
+
+self.addEventListener('message', event => {
+  const data = event.data || {};
+  if (data.type === 'rest-cancel') {
+    clearRest();
+  } else if (data.type === 'rest-start') {
+    clearRest();
+    event.waitUntil(new Promise(resolve => {
+      restRelease = resolve;
+      restTimeout = setTimeout(() => {
+        restTimeout = null;
+        restRelease = null;
+        notifyRestEnd(data.label).catch(() => {}).then(resolve);
+      }, Math.max(0, data.endAt - Date.now()));
+    }));
+  }
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (windows.length) return windows[0].focus();
+    return self.clients.openWindow('/');
+  })());
+});
+
 // Réseau d'abord (pour avoir les données à jour), cache en secours
 async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
