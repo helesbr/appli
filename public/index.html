@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#09090b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -24,8 +24,8 @@
       --border: rgba(255,255,255,0.07);
       --border-strong: rgba(255,255,255,0.13);
       --text: #f4f4f5;
-      --muted: #a1a1aa;
-      --subtle: #71717a;
+      --muted: #b8b8c2;
+      --subtle: #9a9aa6;
       --accent: #c8f53b;
       --accent-ink: #0b0d02;
       --accent-soft: rgba(200,245,59,0.10);
@@ -75,6 +75,8 @@
     body.modal-open { overflow: hidden; }
 
     button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    button:disabled { opacity: 0.35; cursor: default; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     input, select { font: inherit; color: inherit; }
 
     .ic { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -297,6 +299,8 @@
       box-shadow: 0 10px 24px -10px rgba(0,0,0,0.6); transition: transform .12s;
     }
     .hero-btn:active { transform: scale(0.96); }
+    .hero-actions { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .hero-actions .btn { height: 42px; }
     .hero-btn .ic { fill: currentColor; }
     .stat-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtle); }
     .stat-value { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; }
@@ -332,9 +336,9 @@
     .day-name { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--subtle); }
     .day-num { font-family: var(--font-display); font-size: 1.45rem; font-weight: 600; line-height: 1.1; }
     .day-cell.today .day-num, .day-cell.today .day-name { color: var(--accent); }
-    .day-cell.past:not(.today) .day-meta { opacity: 0.5; }
+    .day-cell.past:not(.today) .day-meta { opacity: 0.8; }
     .day-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
-    .day-empty { display: flex; align-items: center; gap: 6px; color: var(--subtle); font-size: 0.85rem; }
+    .day-empty { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 36px; text-align: left; color: var(--subtle); font-size: 0.85rem; }
     .day-empty .ic { width: 16px; height: 16px; }
 
     .session-dot {
@@ -363,6 +367,11 @@
     .chip-play .ic { fill: currentColor; }
     .s-done { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); }
     .session-dot.completed .s-name::before { background: var(--subtle); box-shadow: none; }
+    /* Statut lisible sans la couleur : le texte « Terminée » / « Manquée » l'accompagne */
+    .session-dot.missed { border-color: rgba(251,113,133,0.35); }
+    .session-dot.missed .s-name::before { background: var(--danger); box-shadow: none; }
+    .session-dot.missed .s-meta { color: var(--danger); }
+    .session-dot.done .s-name { color: var(--muted); }
 
     /* --- MODE SÉANCE --- */
     .workout {
@@ -388,9 +397,11 @@
     .wk-exo { background: var(--card-bg); border: 1px solid var(--card-border); box-shadow: var(--card-shadow); border-radius: var(--radius); padding: 14px 12px; margin-bottom: 10px; }
     .block-wrapper.superset .wk-exo { background: var(--surface-2); }
     .block-wrapper.superset .wk-exo:last-child { margin-bottom: 0; }
-    .wk-exo-head { display: flex; align-items: center; gap: 8px; }
+    .wk-exo-tools { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+    .wk-exo-tools .rest-pill { min-height: 36px; padding: 0 12px; }
+    .wk-exo-tools .danger { margin-left: auto; }
     .wk-exo-name {
-      flex: 1; min-width: 0; padding: 4px 0;
+      width: 100%; min-width: 0; padding: 4px 0;
       background: transparent; border: none; border-bottom: 1px dashed transparent; outline: none;
       color: var(--text); font-family: var(--font-display); font-size: 1.15rem; font-weight: 600;
     }
@@ -430,6 +441,10 @@
     .wk-set.done input { border-color: var(--accent-line); background: rgba(200,245,59,0.06); }
     .wk-set.done .set-idx { background: var(--accent); color: var(--accent-ink); }
     .wk-set .wk-del { width: 28px; height: 28px; background: transparent; border-color: transparent; }
+    /* +2.5 / -2.5 sous la charge, masqués une fois la série validée */
+    .wk-step { grid-column: 3 / 5; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .wk-step button { height: 40px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-strong); font-size: 0.85rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .wk-step button:active { background: var(--accent); color: var(--accent-ink); }
     .wk-exo .add-set { margin-top: 2px; width: 100%; }
     /* Minuteur de repos */
     .rest-timer { background: var(--surface-2); border-top: 1px solid var(--violet-line); flex-shrink: 0; animation: toastIn .25s var(--ease); transition: background .3s; }
@@ -559,7 +574,7 @@
     .modal .unit-input input[type=number], .modal .unit-input input[type=text] {
       width: 38px; height: 100%;
       padding: 0; border: none; background: transparent; box-shadow: none;
-      text-align: center; font-size: 15px; font-weight: 600; color: var(--text);
+      text-align: center; font-size: 16px; font-weight: 600; color: var(--text);
     }
     .unit-input .ic { width: 14px; height: 14px; }
 
@@ -588,8 +603,10 @@
       margin-bottom: 8px;
     }
     .exercise-block:last-child { margin-bottom: 0; }
-    .exo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-    .modal .exo-header input.exo-name { flex: 1; min-width: 0; font-weight: 600; }
+    .exo-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .exo-header .remove-exo { margin-left: auto; }
+    .move-btns { display: inline-flex; gap: 4px; flex-shrink: 0; }
+    .modal .exo-header input.exo-name { flex: 1 1 100%; min-width: 0; font-weight: 600; }
 
     .sets-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; margin-top: -6px; }
     .sets-table th { color: var(--subtle); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; padding: 0 4px; }
@@ -655,9 +672,8 @@
       .tpl-exo-row { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
       .tpl-exo-row:last-child { border-bottom: none; padding-bottom: 0; }
       /* Nom + bouton supprimer sur la 1re ligne, séries / reps / repos sur la 2e */
-      .modal .tpl-exo-row input.tpl-exo-name { flex-basis: calc(100% - 46px); }
-      .tpl-exo-row .icon-btn { order: 1; }
-      .tpl-exo-row .unit-input { order: 2; padding: 0 8px; gap: 2px; }
+      .modal .tpl-exo-row input.tpl-exo-name { flex-basis: 100%; }
+      .tpl-exo-row .unit-input { padding: 0 8px; gap: 2px; }
       .modal .tpl-exo-row .unit-input input[type=number] { width: 30px; }
       .modal .tpl-exo-row .unit-input input.tpl-exo-reps { width: 40px; }
     }
@@ -708,20 +724,21 @@
     .session-detail-exo td:last-child { font-weight: 600; }
 
     /* --- EMPTY --- */
-    .empty {
+    .empty, .no-result {
       text-align: center;
       color: var(--muted);
       padding: 40px 20px;
       font-size: 0.95rem;
       user-select: none;
     }
+    .no-result { padding: 24px 12px; }
     .empty::before {
       content: '';
       display: block;
       width: 56px; height: 56px;
       margin: 0 auto 14px;
       border-radius: 18px;
-      background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E") no-repeat center;
+      background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='%239a9aa6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E") no-repeat center;
       border: 1px dashed var(--border-strong);
     }
 
@@ -744,6 +761,22 @@
     .toast.error { background: var(--danger); color: #1a0508; }
     .toast.error .ic { color: inherit; }
     .toast.out { opacity: 0; transform: translateY(8px); transition: all .25s; }
+    .toast span { flex: 1; min-width: 0; }
+    .toast-action { pointer-events: auto; flex-shrink: 0; min-height: 36px; padding: 0 12px; margin: -6px -6px -6px 4px; border-radius: 10px; background: #09090b; color: var(--accent); font-weight: 700; font-size: 0.85rem; }
+    /* En séance, les messages restent au-dessus du minuteur et du bouton Terminer */
+    body:has(.workout:not([hidden])) .toast-stack { bottom: calc(160px + env(safe-area-inset-bottom)); }
+    .sync-pill { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 999px; background: var(--violet-soft); border: 1px solid var(--violet-line); color: var(--violet); font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+    .sync-pill .ic { width: 13px; height: 13px; }
+    /* Réglages */
+    .settings-group { margin-bottom: 8px; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; margin-bottom: 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .settings-row-info { min-width: 0; }
+    .settings-row-title { font-weight: 600; font-size: 0.92rem; overflow-wrap: anywhere; }
+    .settings-note { color: var(--muted); font-size: 0.82rem; }
+    .settings-note.error { color: var(--danger); }
+    .settings-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .tag-current { color: var(--accent); font-size: 0.72rem; font-weight: 600; margin-left: 4px; white-space: nowrap; }
+    .empty-action { margin-top: 14px; }
 
     /* --- ANIMATIONS --- */
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -793,6 +826,11 @@
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
     <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></symbol>
     <symbol id="i-logo" viewBox="0 0 24 24"><path d="M5 17V7l7 5 7-5v10"/></symbol>
   </svg>
 
@@ -804,7 +842,8 @@
     </div>
     <div class="appbar-right">
       <div class="appbar-date" id="todayLabel"></div>
-      <button class="icon-btn" id="logoutBtn" aria-label="Se déconnecter" title="Se déconnecter"><svg class="ic ic-sm"><use href="#i-logout"/></svg></button>
+      <button class="sync-pill" id="syncPill" hidden><svg class="ic"><use href="#i-sync"/></svg><span></span></button>
+      <button class="icon-btn" id="settingsBtn" aria-label="Réglages" title="Réglages"><svg class="ic ic-sm"><use href="#i-settings"/></svg></button>
     </div>
   </header>
 
@@ -871,7 +910,7 @@
       <p class="sub">Crée tes semaines modèles et applique-les en un geste.</p>
     </div>
     <div id="tplList"></div>
-    <p class="empty" id="tplEmpty">Aucun template pour l'instant.<br>Crée ta première semaine type !</p>
+    <p class="empty" id="tplEmpty">Prépare une semaine une fois,<br>puis applique-la en un geste quand tu veux.</p>
     <button class="btn btn-primary btn-block" id="addTplBtn" style="margin-top:8px;"><svg class="ic"><use href="#i-plus"/></svg>Nouveau template</button>
   </main>
 
@@ -883,10 +922,13 @@
     </div>
     <label class="search">
       <svg class="ic"><use href="#i-search"/></svg>
-      <input type="text" id="perfSearch" placeholder="Rechercher un exercice…" autocomplete="off">
+      <input type="text" id="perfSearch" placeholder="Rechercher un exercice…" aria-label="Rechercher un exercice" autocomplete="off">
     </label>
     <div id="perfList"></div>
-    <p class="empty" id="perfEmpty">Aucune perf enregistrée.<br>Ajoute des séances pour voir tes records.</p>
+    <p class="no-result" id="perfNoResult" hidden></p>
+    <div class="empty" id="perfEmpty">Tes records apparaîtront ici<br>dès ta première série avec une charge.
+      <div class="empty-action"><button class="btn btn-primary btn-sm" id="perfEmptyBtn"><svg class="ic ic-sm"><use href="#i-calendar"/></svg>Voir mes séances</button></div>
+    </div>
   </main>
 
   <!-- TAB BAR -->
@@ -1002,7 +1044,9 @@
       </div>
       <div class="modal-body">
         <div id="applyTplList"></div>
-        <p class="empty" id="applyTplEmpty">Aucun template disponible</p>
+        <div class="empty" id="applyTplEmpty">Tu n'as pas encore de semaine type.
+          <div class="empty-action"><button class="btn btn-primary btn-sm" id="applyTplCreateBtn"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Créer une semaine type</button></div>
+        </div>
       </div>
       <div class="modal-foot">
         <button class="btn btn-secondary grow" id="closeApplyTplBtn">Annuler</button>
@@ -1041,7 +1085,51 @@
     </div>
   </div>
 
-  <!-- Script séparé : la CSP du serveur interdit les scripts inline -->
-  <script src="/main.js"></script>
+  <!-- MODAL: Réglages -->
+  <div class="modal-overlay" id="settingsModal" data-dismiss>
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-head">
+        <h3>Réglages</h3>
+        <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="section-title">Mes données</div>
+        <p class="settings-note" id="settingsSync" style="margin-bottom:8px;"></p>
+        <div class="settings-actions">
+          <button class="btn btn-secondary btn-sm" id="exportJsonBtn"><svg class="ic ic-sm"><use href="#i-download"/></svg>Sauvegarde JSON</button>
+          <button class="btn btn-secondary btn-sm" id="exportCsvBtn"><svg class="ic ic-sm"><use href="#i-download"/></svg>Tableau CSV</button>
+        </div>
+        <div class="section-title">Appareils connectés</div>
+        <div id="deviceList" class="settings-group"></div>
+        <div class="settings-actions">
+          <button class="btn btn-secondary btn-sm" id="logoutBtn"><svg class="ic ic-sm"><use href="#i-logout"/></svg>Me déconnecter</button>
+          <button class="btn btn-danger btn-sm" id="logoutAllBtn">Tout déconnecter</button>
+        </div>
+        <div class="section-title">État du serveur</div>
+        <p class="settings-note" id="healthStatus"></p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary grow" id="closeSettingsBtn">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="exoSuggestions"></datalist>
+
+  <!-- Scripts séparés (la CSP du serveur interdit les scripts inline), dans l'ordre de dépendance -->
+  <script src="/js/logic.js"></script>
+  <script src="/js/core.js"></script>
+  <script src="/js/outbox.js"></script>
+  <script src="/js/suggestions.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/rest-timer.js"></script>
+  <script src="/js/calendar.js"></script>
+  <script src="/js/session-form.js"></script>
+  <script src="/js/workout.js"></script>
+  <script src="/js/templates.js"></script>
+  <script src="/js/perfs.js"></script>
+  <script src="/js/settings.js"></script>
+  <script src="/js/app.js"></script>
 </body>
 </html>
