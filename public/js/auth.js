@@ -9,23 +9,29 @@ function deviceName() {
   const installed = window.matchMedia && matchMedia('(display-mode: standalone)').matches;
   return os + (installed ? ' (appli)' : ' (navigateur)');
 }
-// Anciennes connexions : passage en douceur au système par appareil, sans redemander le mot de passe
-async function upgradeLegacyToken() {
+// L'identifiant de l'appareil survit à la fin de la connexion du jour : on retrouve la même fiche demain
+const DEVICE_KEY = 'moggtrack-device';
+function rememberDevice() {
   const token = getToken();
-  if (!token || token.split('.').length !== 2) return;
-  const res = await api('/api/token/upgrade', { method: 'POST', body: { deviceName: deviceName() } });
-  if (res.token) setToken(res.token);
+  if (!token || !token.startsWith('d.')) return;
+  try { localStorage.setItem(DEVICE_KEY, token.split('.')[1]); } catch (e) {}
+}
+function rememberedDevice() {
+  try { return localStorage.getItem(DEVICE_KEY); } catch (e) { return null; }
+}
+function forgetDevice() {
+  try { localStorage.removeItem(DEVICE_KEY); } catch (e) {}
 }
 
 function startApp() {
   document.getElementById('loginScreen').hidden = true;
-  quiet(upgradeLegacyToken());
   quiet(loadSessions());
   quiet(loadTemplates());
   loadPushKey().catch(() => {});
   flushOutbox();
 }
 function showLogin(message) {
+  rememberDevice();
   setToken(null);
   sessions = []; templates = []; perfs = [];
   if ('caches' in window) caches.delete('moggtrack-api').catch(() => {});
@@ -45,7 +51,7 @@ document.getElementById('loginForm').onsubmit = async e => {
   try {
     let res;
     try {
-      res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input.value, deviceName: deviceName() }) });
+      res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: input.value, deviceId: rememberedDevice(), deviceName: deviceName() }) });
     } catch (e) { throw new Error('Pas de connexion internet'); }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Connexion impossible');

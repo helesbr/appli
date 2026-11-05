@@ -32,6 +32,7 @@ async function logoutDevice(device) {
   if (device.current) {
     closeModal('settingsModal');
     showLogin();
+    forgetDevice();
     renderWeek();
     return;
   }
@@ -117,6 +118,7 @@ document.getElementById('logoutBtn').onclick = async () => {
     if (token.startsWith('d.')) api('/api/devices/' + id, { method: 'DELETE', keepalive: true }).catch(() => {});
   }
   showLogin();
+  forgetDevice();
   renderWeek();
 };
 document.getElementById('logoutAllBtn').onclick = async () => {
@@ -124,5 +126,6 @@ document.getElementById('logoutAllBtn').onclick = async () => {
   await api('/api/devices/logout-all', { method: 'POST', body: {} });
   closeModal('settingsModal');
   showLogin('Tous les appareils sont déconnectés');
+  forgetDevice();
   renderWeek();
 };

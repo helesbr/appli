@@ -58,7 +58,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // --- BASE DE DONNÉES ---
-let db, sessionsCol, templatesCol, restTimersCol, devicesCol, loginAttemptsCol, settingsCol, appErrorsCol;
+let db, sessionsCol, templatesCol, restTimersCol, devicesCol, loginAttemptsCol, appErrorsCol;
 
 async function connectMongo() {
   if (!MONGODB_URI) throw new Error('Variable MONGODB_URI manquante ou vide');
@@ -73,7 +73,6 @@ async function connectMongo() {
   restTimersCol = db.collection('restTimers');
   devicesCol = db.collection('devices');
   loginAttemptsCol = db.collection('loginAttempts');
-  settingsCol = db.collection('settings');
   appErrorsCol = db.collection('appErrors');
   await ensureIndexes();
   console.log('Connecté à MongoDB Atlas');
@@ -89,7 +88,6 @@ async function ensureIndexes() {
     [restTimersCol, { id: 1 }, { unique: true, name: 'id_unique' }],
     [devicesCol, { id: 1 }, { unique: true, name: 'id_unique' }],
     [loginAttemptsCol, { key: 1 }, { unique: true, name: 'key_unique' }],
-    [settingsCol, { key: 1 }, { unique: true, name: 'key_unique' }],
     [appErrorsCol, { at: 1 }, { name: 'at_asc' }],
     // Mongo supprime seul ces documents une fois périmés
     [restTimersCol, { expireAt: 1 }, { expireAfterSeconds: 0, name: 'expire_at' }],
@@ -158,45 +156,37 @@ function safeEqual(a, b) {
 function signToken(payload) {
   return crypto.createHmac('sha256', 'moggtrack:' + APP_PASSWORD).update(payload).digest('base64url');
 }
-// Ancien format (date d'expiration + signature) : encore accepté jusqu'à « Tout déconnecter »
-function isValidLegacyToken(token) {
-  const parts = String(token || '').split('.');
-  if (parts.length !== 2) return false;
-  const [exp, sig] = parts;
-  if (!exp || !sig || !(Number(exp) > Date.now())) return false;
-  return safeEqual(sig, signToken(exp));
+// Une connexion vaut pour la journée, qui change à 4 h à Paris :
+// une séance tardive n'est jamais coupée par minuit.
+const SESSION_DAY_START_MS = 4 * 60 * 60 * 1000;
+const sessionDayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' });
+function sessionDay(now = Date.now()) {
+  return sessionDayFormat.format(new Date(now - SESSION_DAY_START_MS));
 }
-async function createDevice(name) {
-  const id = crypto.randomUUID();
+function deviceToken(id) {
+  const day = sessionDay();
+  return `d.${id}.${day}.${signToken(`device:${id}:${day}`)}`;
+}
+// Se reconnecter réutilise la fiche de l'appareil : la liste ne grossit pas chaque jour
+async function openDeviceSession(deviceId, name) {
   const now = new Date();
-  await devicesCol.insertOne({
-    id,
-    name: cleanText(name, 60) || 'Appareil',
-    createdAt: now,
-    lastSeen: now,
-    expireAt: new Date(now.getTime() + DEVICE_TTL_MS)
-  });
-  return { id, token: `d.${id}.${signToken('device:' + id)}` };
+  const expireAt = new Date(now.getTime() + DEVICE_TTL_MS);
+  const known = typeof deviceId === 'string' && UUID_RE.test(deviceId) && await devicesCol.findOne({ id: deviceId });
+  if (known) {
+    await devicesCol.updateOne({ id: deviceId }, { $set: { lastSeen: now, expireAt } });
+    return deviceToken(deviceId);
+  }
+  const id = crypto.randomUUID();
+  await devicesCol.insertOne({ id, name: cleanText(name, 60) || 'Appareil', createdAt: now, lastSeen: now, expireAt });
+  return deviceToken(id);
 }
-// Renvoie l'appareil connecté, { legacy: true } pour un ancien jeton, ou null
+// Renvoie l'appareil connecté, ou null si le jeton est invalide, d'un autre jour ou d'un appareil déconnecté
 async function authenticate(token) {
   const parts = String(token || '').split('.');
-  if (parts[0] === 'd' && parts.length === 3) {
-    const [, id, sig] = parts;
-    if (!UUID_RE.test(id) || !safeEqual(sig, signToken('device:' + id))) return null;
-    const device = await devicesCol.findOne({ id }, NO_ID);
-    if (!device) return null;
-    // Au plus une écriture par jour pour tenir la date d'utilisation à jour
-    const now = Date.now();
-    if (now - new Date(device.lastSeen).getTime() > DAY_MS) {
-      devicesCol.updateOne({ id }, { $set: { lastSeen: new Date(now), expireAt: new Date(now + DEVICE_TTL_MS) } })
-        .catch(e => reportError('devices', e));
-    }
-    return device;
-  }
-  if (!isValidLegacyToken(token)) return null;
-  const revoked = await settingsCol.findOne({ key: 'legacyTokensRevoked' });
-  return revoked ? null : { legacy: true };
+  if (parts[0] !== 'd' || parts.length !== 4) return null;
+  const [, id, day, sig] = parts;
+  if (!UUID_RE.test(id) || day !== sessionDay() || !safeEqual(sig, signToken(`device:${id}:${day}`))) return null;
+  return devicesCol.findOne({ id }, NO_ID);
 }
 
 function loginKey(req) {
@@ -232,8 +222,7 @@ app.post('/api/login', async (req, res, next) => {
       return res.status(401).json({ error: 'Mot de passe incorrect', code: 'BAD_PASSWORD' });
     }
     await loginAttemptsCol.deleteOne({ key });
-    const device = await createDevice(req.body.deviceName);
-    res.json({ token: device.token });
+    res.json({ token: await openDeviceSession(req.body.deviceId, req.body.deviceName) });
   } catch (e) {
     next(e);
   }
@@ -380,12 +369,6 @@ function cleanTemplateSessions(list) {
 const route = fn => (req, res, next) => fn(req, res).catch(next);
 
 // --- APPAREILS CONNECTÉS ---
-app.post('/api/token/upgrade', route(async (req, res) => {
-  if (!req.device.legacy) return res.json({});
-  const device = await createDevice((req.body || {}).deviceName);
-  res.json({ token: device.token });
-}));
-
 app.get('/api/devices', route(async (req, res) => {
   const devices = await devicesCol.find({}, NO_ID).toArray();
   res.json(devices
@@ -395,11 +378,6 @@ app.get('/api/devices', route(async (req, res) => {
 
 app.post('/api/devices/logout-all', route(async (req, res) => {
   await devicesCol.deleteMany({});
-  await settingsCol.findOneAndUpdate(
-    { key: 'legacyTokensRevoked' },
-    { $set: { value: true, at: new Date() } },
-    { upsert: true }
-  );
   res.json({ message: 'Tous les appareils sont déconnectés' });
 }));
 
@@ -713,3 +691,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+module.exports.sessionDay = sessionDay;
