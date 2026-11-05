@@ -19,7 +19,7 @@ async function api(url, opts = {}) {
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   let res;
   try {
-    res = await fetch(url, { method: opts.method || 'GET', headers, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
+    res = await fetch(url, { method: opts.method || 'GET', headers, keepalive: !!opts.keepalive, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
   } catch (e) {
     throw new Error('Pas de connexion : réessaie quand tu seras en ligne');
   }
@@ -44,6 +44,7 @@ function startApp() {
   document.getElementById('loginScreen').hidden = true;
   loadSessions();
   loadTemplates();
+  loadPushKey().catch(() => {});
   if (!pollTimer) pollTimer = setInterval(() => { if (!document.hidden) loadSessions().catch(() => {}); }, 5000);
 }
 function showLogin(message) {
@@ -357,16 +358,16 @@ function addBlockUI(type, exercises) {
   document.getElementById('blockList').appendChild(wrapper);
 }
 
-// Poids : accepte 82,5 et 82.5 ; toujours enregistré avec un point
+// Poids : toujours avec un point (règle anglaise), même si le clavier propose une virgule
 function normalizeWeight(v) {
   return String(v ?? '').trim().replace(',', '.').replace(/\.$/, '');
 }
-// Garde uniquement des chiffres et un seul séparateur décimal pendant la saisie
+// Pendant la saisie : la virgule devient un point ; chiffres et un seul point uniquement
 function cleanWeightTyping(v) {
-  const kept = v.replace(/[^\d.,]/g, '');
-  const sep = kept.search(/[.,]/);
+  const kept = v.replace(/,/g, '.').replace(/[^\d.]/g, '');
+  const sep = kept.indexOf('.');
   if (sep < 0) return kept;
-  return kept.slice(0, sep + 1) + kept.slice(sep + 1).replace(/[.,]/g, '');
+  return kept.slice(0, sep + 1) + kept.slice(sep + 1).replace(/\./g, '');
 }
 // En phase de capture : le champ est nettoyé avant que la séance ne lise sa valeur
 document.addEventListener('input', e => {
@@ -693,9 +694,15 @@ function fmtClock(sec) {
 }
 
 // --- NOTIFICATION DE FIN DE REPOS ---
+// iOS met l'appli en pause en arrière-plan : c'est le serveur qui envoie la notification (Web Push)
 const NOTIF_ASKED_KEY = 'moggtrack-notif-asked';
 const REST_NOTIF_TAG = 'rest-timer';
+let pushKey = null;
+let pushErrorShown = false;
 
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
 function restNotifAllowed() {
   return 'Notification' in window && Notification.permission === 'granted';
 }
@@ -703,37 +710,87 @@ function swRegistration() {
   if (!('serviceWorker' in navigator)) return Promise.resolve(null);
   return navigator.serviceWorker.getRegistration().catch(() => null);
 }
-// Demandé une seule fois, pendant un geste de l'utilisateur (obligatoire sur iPhone)
+async function loadPushKey() {
+  if (!pushKey) pushKey = (await api('/api/push-key')).key;
+  return pushKey;
+}
+function base64UrlToBytes(value) {
+  const b64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+async function getPushSubscription(create) {
+  const reg = await swRegistration();
+  if (!reg || !reg.pushManager) return null;
+  const existing = await reg.pushManager.getSubscription();
+  if (existing || !create) return existing;
+  return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(await loadPushKey()) });
+}
+// Le bouton Notif reste visible tant que ce téléphone n'est pas abonné
+async function updateRestBell() {
+  const bell = document.getElementById('rtNotif');
+  let active = false;
+  try { active = pushSupported() && restNotifAllowed() && !!(await getPushSubscription(false)); } catch (e) {}
+  bell.hidden = active;
+}
+// Doit partir d'un geste de l'utilisateur (obligatoire sur iPhone)
+async function enableRestPush() {
+  if (!pushSupported()) {
+    toast('Sur iPhone : ajoute l\'appli à l\'écran d\'accueil et ouvre-la depuis son icône', 'error');
+    return;
+  }
+  try {
+    const result = await Notification.requestPermission();
+    if (result === 'denied') {
+      toast('Notifications bloquées : autorise-les dans les réglages du téléphone', 'error');
+      return;
+    }
+    if (result !== 'granted') return;
+    if (!(await getPushSubscription(true))) throw new Error('rouvre l\'appli puis réessaie');
+    toast('Notification de fin de repos activée');
+    updateRestBell();
+    if (rest && !rest.finished) armRestNotification();
+  } catch (e) {
+    toast('Notification impossible : ' + e.message, 'error');
+  }
+}
+// Proposé une seule fois au premier repos ; ensuite, le bouton Notif reste disponible
 function askRestNotifications() {
   try {
     if (localStorage.getItem(NOTIF_ASKED_KEY)) return;
-    if (!('Notification' in window)) {
-      localStorage.setItem(NOTIF_ASKED_KEY, '1');
-      toast('Pour la notification de repos, ajoute l\'appli à ton écran d\'accueil');
-      return;
-    }
-    if (Notification.permission !== 'default') return;
     localStorage.setItem(NOTIF_ASKED_KEY, '1');
-    Notification.requestPermission().then(result => {
-      if (result === 'granted') {
-        toast('Notification de fin de repos activée');
-        if (rest && !rest.finished) armRestNotification();
-      } else if (result === 'denied') {
-        toast('Notifications bloquées : autorise-les dans les réglages du navigateur', 'error');
-      }
-    }).catch(() => {});
-  } catch (e) {}
+  } catch (e) { return; }
+  if (!pushSupported() || Notification.permission === 'default') enableRestPush();
 }
-// Confie la fin du repos au service worker : il continue quand l'appli passe en arrière-plan
-async function armRestNotification() {
-  if (!rest || !restNotifAllowed()) return;
-  const { endAt, label } = rest;
-  const reg = await swRegistration();
-  if (reg && reg.active) reg.active.postMessage({ type: 'rest-start', endAt, label });
+function showPushError(e) {
+  console.warn('Notification de repos :', e);
+  if (pushErrorShown || (e && e.silent)) return;
+  pushErrorShown = true;
+  toast('Notification de repos indisponible : ' + e.message, 'error');
 }
-async function cancelRestNotification() {
-  const reg = await swRegistration();
-  if (reg && reg.active) reg.active.postMessage({ type: 'rest-cancel' });
+// Programme la notification sur le serveur. Les requêtes s'enchaînent pour que
+// +15 / -15 remplacent bien la précédente, même si elle n'a pas encore répondu.
+function armRestNotification() {
+  if (!rest || !pushSupported() || !restNotifAllowed()) return;
+  const current = rest, previous = current.pushReq;
+  current.pushReq = (async () => {
+    const replaces = previous ? await previous : null;
+    const sub = await getPushSubscription(true);
+    if (!sub) return null;
+    const seconds = Math.max(1, Math.ceil((current.endAt - Date.now()) / 1000));
+    const res = await api('/api/rest-timer', {
+      method: 'POST',
+      keepalive: true,
+      body: { seconds, label: current.label || '', subscription: sub.toJSON(), replaces }
+    });
+    return res.id;
+  })().catch(e => { showPushError(e); return null; });
+}
+function cancelRestNotification() {
+  const pending = rest && rest.pushReq;
+  if (!pending) return;
+  pending.then(id => {
+    if (id) return api('/api/rest-timer/' + id, { method: 'DELETE', keepalive: true });
+  }).catch(() => {});
 }
 async function closeRestNotification() {
   const reg = await swRegistration();
@@ -741,7 +798,7 @@ async function closeRestNotification() {
   const shown = await reg.getNotifications({ tag: REST_NOTIF_TAG }).catch(() => []);
   shown.forEach(n => n.close());
 }
-// Filet de sécurité si la page se réveille avant le service worker (même tag : pas de doublon)
+// Filet de sécurité (ordinateur, Android) : même tag que le serveur, donc pas de doublon
 async function showRestNotification(label) {
   if (!restNotifAllowed()) return;
   const options = {
@@ -766,6 +823,7 @@ function startRest(seconds, label) {
   restEl.classList.remove('finished');
   restEl.hidden = false;
   rest.timer = setInterval(tickRest, 250);
+  updateRestBell();
   armRestNotification();
   tickRest();
 }
@@ -783,13 +841,16 @@ function tickRest() {
     beep();
     if (document.hidden) showRestNotification(rest.label);
     const ended = rest;
-    setTimeout(() => { if (rest === ended) stopRest(); }, 6000);
+    setTimeout(() => {
+      if (rest === ended) stopRest();
+      if (!document.hidden) closeRestNotification().catch(() => {});
+    }, 6000);
   }
 }
 function stopRest() {
   if (rest) {
     clearInterval(rest.timer);
-    if (!rest.finished) cancelRestNotification().catch(() => {});
+    if (!rest.finished) cancelRestNotification();
   }
   rest = null;
   restEl.hidden = true;
@@ -808,6 +869,7 @@ function adjustRest(delta) {
 document.getElementById('rtMinus').onclick = () => adjustRest(-15);
 document.getElementById('rtPlus').onclick = () => adjustRest(15);
 document.getElementById('rtSkip').onclick = stopRest;
+document.getElementById('rtNotif').onclick = enableRestPush;
 
 // Garde l'écran allumé pendant la séance (si le navigateur le permet)
 async function keepAwake() {

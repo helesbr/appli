@@ -4,6 +4,7 @@ const path = require('path');
 
 const { MongoClient } = require('mongodb');
 const crypto = require('crypto');
+const webpush = require('web-push');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -88,6 +89,45 @@ app.post('/api/login', async (req, res) => {
   res.json({ token: createToken() });
 });
 
+// --- NOTIFICATIONS DE FIN DE REPOS ---
+// QStash rappelle /fire à la fin du repos, puis le serveur envoie le push au téléphone.
+const VAPID_PUBLIC_KEY = (process.env.VAPID_PUBLIC_KEY || '').trim();
+const VAPID_PRIVATE_KEY = (process.env.VAPID_PRIVATE_KEY || '').trim();
+const VAPID_SUBJECT = (process.env.VAPID_SUBJECT || 'https://moggtrack.vercel.app').trim();
+const QSTASH_TOKEN = (process.env.QSTASH_TOKEN || '').trim();
+const QSTASH_URL = (process.env.QSTASH_URL || 'https://qstash.upstash.io').trim().replace(/\/+$/, '');
+const PUBLIC_URL = (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Appelé par QStash, donc sans mot de passe : l'identifiant aléatoire du minuteur sert de preuve
+app.post('/api/rest-timer/:id/fire', async (req, res) => {
+  if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Minuteur introuvable' });
+  try {
+    await ensureMongo();
+    const timer = await restTimersCol.findOne({ id: req.params.id });
+    if (!timer) return res.json({ sent: false }); // annulé ou remplacé entre-temps
+    const payload = JSON.stringify({
+      title: 'Repos terminé',
+      body: (timer.label ? timer.label + ' : ' : '') + 'c\'est reparti !'
+    });
+    await webpush.sendNotification(timer.subscription, payload, {
+      vapidDetails: { subject: VAPID_SUBJECT, publicKey: VAPID_PUBLIC_KEY, privateKey: VAPID_PRIVATE_KEY },
+      TTL: 120,
+      urgency: 'high'
+    });
+    await restTimersCol.deleteOne({ id: timer.id });
+    res.json({ sent: true });
+  } catch (e) {
+    // Abonnement expiré : inutile de réessayer, l'appli se réabonne au prochain repos
+    if (e.statusCode === 404 || e.statusCode === 410) {
+      await restTimersCol.deleteOne({ id: req.params.id }).catch(() => {});
+      return res.json({ sent: false, expired: true });
+    }
+    console.error('Envoi du push :', e.statusCode || '', e.body || e.message);
+    res.status(502).json({ error: 'Envoi de la notification impossible' }); // QStash retentera
+  }
+});
+
 app.use('/api', (req, res, next) => {
   if (!APP_PASSWORD) return res.status(503).json(NO_PASSWORD);
   const token = (req.get('Authorization') || '').replace(/^Bearer\s+/i, '');
@@ -95,7 +135,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-let db, sessionsCol, templatesCol;
+let db, sessionsCol, templatesCol, restTimersCol;
 
 async function connectMongo() {
   if (!MONGODB_URI) throw new Error('Variable MONGODB_URI manquante ou vide');
@@ -107,6 +147,7 @@ async function connectMongo() {
   db = client.db(MONGODB_DBNAME);
   sessionsCol = db.collection('sessions');
   templatesCol = db.collection('templates');
+  restTimersCol = db.collection('restTimers');
   await ensureIndexes();
   console.log('Connecté à MongoDB Atlas');
 }
@@ -117,7 +158,10 @@ async function ensureIndexes() {
   const specs = [
     [sessionsCol, { id: 1 }, { unique: true, name: 'id_unique' }],
     [sessionsCol, { date: 1 }, { name: 'date_asc' }],
-    [templatesCol, { id: 1 }, { unique: true, name: 'id_unique' }]
+    [templatesCol, { id: 1 }, { unique: true, name: 'id_unique' }],
+    [restTimersCol, { id: 1 }, { unique: true, name: 'id_unique' }],
+    // Mongo supprime seul les minuteurs jamais déclenchés
+    [restTimersCol, { expireAt: 1 }, { expireAfterSeconds: 0, name: 'expire_at' }]
   ];
   for (const [col, key, opts] of specs) {
     try {
@@ -358,6 +402,65 @@ app.post('/api/templates/:id/apply', route(async (req, res) => {
   // Une seule écriture pour toute la semaine
   if (created.length > 0) await sessionsCol.insertMany(created.map(s => ({ ...s })));
   res.status(201).json({ message: `${created.length} séances créées`, sessions: created });
+}));
+
+// --- MINUTEUR DE REPOS (notification) ---
+const NO_PUSH = { error: 'notifications non configurées sur le serveur', code: 'PUSH_NOT_CONFIGURED' };
+
+function cleanSubscription(sub) {
+  const endpoint = sub && sub.endpoint;
+  const keys = sub && sub.keys;
+  if (typeof endpoint !== 'string' || !endpoint.startsWith('https://') || endpoint.length > 2048) return null;
+  if (!keys || typeof keys.p256dh !== 'string' || typeof keys.auth !== 'string') return null;
+  if (keys.p256dh.length > 256 || keys.auth.length > 256) return null;
+  return { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } };
+}
+
+app.get('/api/push-key', (req, res) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return res.status(503).json(NO_PUSH);
+  res.json({ key: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/rest-timer', route(async (req, res) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !QSTASH_TOKEN) return res.status(503).json(NO_PUSH);
+  const body = req.body || {};
+  const subscription = cleanSubscription(body.subscription);
+  if (!subscription) return res.status(400).json({ error: 'Abonnement aux notifications invalide' });
+  const seconds = toInt(body.seconds, 1, 3600, 0);
+  if (!seconds) return res.status(400).json({ error: 'Durée de repos invalide' });
+
+  // +15 / -15 : l'ancien minuteur est retiré, son rappel QStash ne fera plus rien
+  if (UUID_RE.test(String(body.replaces || ''))) await restTimersCol.deleteOne({ id: body.replaces });
+
+  const id = crypto.randomUUID();
+  await restTimersCol.insertOne({
+    id,
+    label: cleanText(body.label, 100),
+    subscription,
+    expireAt: new Date(Date.now() + (seconds + 3600) * 1000)
+  });
+
+  const proto = req.get('x-forwarded-proto') || req.protocol;
+  const origin = PUBLIC_URL || `${proto}://${req.get('host')}`;
+  const scheduled = await fetch(`${QSTASH_URL}/v2/publish/${origin}/api/rest-timer/${id}/fire`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${QSTASH_TOKEN}`,
+      'Upstash-Delay': `${seconds}s`,
+      'Upstash-Retries': '1'
+    }
+  });
+  if (!scheduled.ok) {
+    await restTimersCol.deleteOne({ id });
+    console.error('QStash :', scheduled.status, (await scheduled.text()).slice(0, 200));
+    return res.status(502).json({ error: 'programmation refusée par QStash' });
+  }
+  res.status(201).json({ id });
+}));
+
+app.delete('/api/rest-timer/:id', route(async (req, res) => {
+  await restTimersCol.deleteOne({ id: req.params.id });
+  res.json({ message: 'Minuteur annulé' });
 }));
 
 // --- TOP PERFS ---
