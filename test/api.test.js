@@ -48,6 +48,7 @@ test.before(async () => {
     }
   });
   ({ collections, state } = loaded);
+  ({ sessionDay } = loaded.app);
   await new Promise(r => { server = loaded.app.listen(0, r); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -65,11 +66,8 @@ async function login(deviceName = 'iPhone (appli)', ip = '10.0.0.1') {
   assert.strictEqual(res.status, 200);
   return (await res.json()).token;
 }
-function legacyToken() {
-  const exp = String(Date.now() + 100000);
-  const sig = crypto.createHmac('sha256', 'moggtrack:' + PASSWORD).update(exp).digest('base64url');
-  return `${exp}.${sig}`;
-}
+const sign = payload => crypto.createHmac('sha256', 'moggtrack:' + PASSWORD).update(payload).digest('base64url');
+let sessionDay;
 
 test('sans connexion, les données sont refusées', async () => {
   for (const url of ['/api/sessions', '/api/templates', '/api/export', '/api/devices', '/api/top-perfs']) {
@@ -117,13 +115,56 @@ test('une signature d\'appareil falsifiée est refusée', async () => {
   assert.strictEqual((await call('GET', '/api/sessions', { token: `d.${id}.fausse` })).status, 401);
 });
 
-test('un ancien jeton reste valable et passe au système par appareil sans mot de passe', async () => {
-  const legacy = legacyToken();
-  assert.strictEqual((await call('GET', '/api/sessions', { token: legacy })).status, 200);
-  const res = await call('POST', '/api/token/upgrade', { token: legacy, body: { deviceName: 'iPhone migré' } });
-  const { token } = await res.json();
-  assert.match(token, /^d\./);
+test('la journée de connexion change à 4 h à Paris, hiver comme été', () => {
+  const day = iso => sessionDay(new Date(iso).getTime());
+  assert.strictEqual(day('2026-01-10T02:59:00Z'), '2026-01-09'); // 3 h 59 à Paris
+  assert.strictEqual(day('2026-01-10T03:01:00Z'), '2026-01-10'); // 4 h 01
+  assert.strictEqual(day('2026-07-10T01:59:00Z'), '2026-07-09'); // 3 h 59
+  assert.strictEqual(day('2026-07-10T02:01:00Z'), '2026-07-10'); // 4 h 01
+});
+
+test('une séance tardive reste dans la même journée après minuit', () => {
+  const day = iso => sessionDay(new Date(iso).getTime());
+  assert.strictEqual(day('2026-01-10T22:30:00Z'), day('2026-01-10T23:30:00Z')); // 23 h 30 et 0 h 30 à Paris
+});
+
+test('la connexion de la veille est refusée, celle du jour acceptée', async () => {
+  const token = await login('Veille');
+  const [, id] = token.split('.');
+  const yesterday = sessionDay(Date.now() - 24 * 60 * 60 * 1000);
+  const old = `d.${id}.${yesterday}.${sign(`device:${id}:${yesterday}`)}`;
+  assert.strictEqual((await call('GET', '/api/sessions', { token: old })).status, 401);
   assert.strictEqual((await call('GET', '/api/sessions', { token })).status, 200);
+  // On ne peut pas changer la date d'un jeton sans refaire sa signature
+  const forged = `d.${id}.${sessionDay()}.${sign(`device:${id}:${yesterday}`)}`;
+  assert.strictEqual((await call('GET', '/api/sessions', { token: forged })).status, 401);
+});
+
+test('les anciens jetons sans date sont refusés : il faut se connecter', async () => {
+  const token = await login('Ancien');
+  const [, id] = token.split('.');
+  assert.strictEqual((await call('GET', '/api/sessions', { token: `d.${id}.${sign('device:' + id)}` })).status, 401);
+  const exp = String(Date.now() + 100000);
+  assert.strictEqual((await call('GET', '/api/sessions', { token: `${exp}.${sign(exp)}` })).status, 401);
+});
+
+test('se reconnecter garde le même appareil dans la liste', async () => {
+  const first = await login('Téléphone quotidien');
+  const [, id] = first.split('.');
+  const again = await call('POST', '/api/login', { body: { password: PASSWORD, deviceId: id, deviceName: 'Téléphone quotidien' }, ip: '10.0.0.1' });
+  const { token } = await again.json();
+  assert.strictEqual(token.split('.')[1], id);
+  const devices = await (await call('GET', '/api/devices', { token })).json();
+  assert.strictEqual(devices.filter(d => d.name === 'Téléphone quotidien').length, 1);
+});
+
+test('un identifiant d\'appareil inconnu ou invalide crée un nouvel appareil', async () => {
+  for (const deviceId of [crypto.randomUUID(), 'pas-un-uuid', { $ne: null }]) {
+    const res = await call('POST', '/api/login', { body: { password: PASSWORD, deviceId, deviceName: 'Nouveau' }, ip: '10.0.0.1' });
+    const { token } = await res.json();
+    assert.notStrictEqual(token.split('.')[1], deviceId);
+    assert.strictEqual((await call('GET', '/api/sessions', { token })).status, 200);
+  }
 });
 
 test('séance créée hors connexion : garde son identifiant, et un renvoi ne crée pas de doublon', async () => {
@@ -281,13 +322,12 @@ test('état du serveur : en échec après plusieurs erreurs récentes', async ()
 });
 
 // Exécuté en dernier : déconnecte tout le monde
-test('« Tout déconnecter » coupe aussi les anciens jetons', async () => {
+test('« Tout déconnecter » coupe tous les appareils', async () => {
   const token = await login();
-  const legacy = legacyToken();
-  assert.strictEqual((await call('GET', '/api/sessions', { token: legacy })).status, 200);
+  const other = await login('Autre');
   assert.strictEqual((await call('POST', '/api/devices/logout-all', { token, body: {} })).status, 200);
   assert.strictEqual((await call('GET', '/api/sessions', { token })).status, 401);
-  assert.strictEqual((await call('GET', '/api/sessions', { token: legacy })).status, 401);
+  assert.strictEqual((await call('GET', '/api/sessions', { token: other })).status, 401);
   const fresh = await login();
   assert.strictEqual((await call('GET', '/api/sessions', { token: fresh })).status, 200);
 });

@@ -24,7 +24,7 @@ async function api(url, opts = {}) {
   }
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 || data.code === 'NO_PASSWORD') {
-    showLogin(data.code === 'NO_PASSWORD' ? data.error : 'Session expirée, reconnecte-toi');
+    showLogin(data.code === 'NO_PASSWORD' ? data.error : '');
     const err = new Error(data.error || 'Non autorisé');
     err.silent = true;
     err.status = res.status;
