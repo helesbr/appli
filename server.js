@@ -339,6 +339,7 @@ function cleanSessionBlocks(blocks) {
     exercises: Array.isArray(b && b.exercises) ? b.exercises.slice(0, 20).map(ex => ({
       name: cleanText(ex && ex.name, 200),
       rest: toInt(ex && ex.rest, 0, 3600, 0),
+      note: cleanText(ex && ex.note, 500),
       sets: Array.isArray(ex && ex.sets) ? ex.sets.slice(0, 50).map(set => ({
         reps: cleanAmount(set && set.reps, 9999),
         weight: cleanAmount(set && set.weight, 9999),
@@ -359,7 +360,8 @@ function cleanTemplateSessions(list) {
         name: cleanText(ex && ex.name, 200),
         setsCount: toInt(ex && ex.setsCount, 1, 20, 4),
         reps: cleanText(ex && ex.reps, 20),
-        rest: toInt(ex && ex.rest, 0, 3600, 0)
+        rest: toInt(ex && ex.rest, 0, 3600, 0),
+        note: cleanText(ex && ex.note, 500)
       }))
     }))
   }));
@@ -437,6 +439,9 @@ app.put('/api/sessions/:id', route(async (req, res) => {
   }
   if (body.blocks !== undefined) update.blocks = cleanSessionBlocks(body.blocks);
   if (typeof body.completed === 'boolean') update.completed = body.completed;
+  // Une séance dupliquée garde la semaine type dont elle vient
+  if (typeof body.templateName === 'string') update.templateName = cleanText(body.templateName, 200);
+  if (typeof body.weekType === 'string') update.weekType = cleanText(body.weekType, 100);
   if (Object.keys(update).length === 0) return res.status(400).json({ error: 'Aucune modification reçue' });
 
   const canCreate = UUID_RE.test(req.params.id) && !!update.date && !!update.name;
@@ -522,6 +527,7 @@ app.post('/api/templates/:id/apply', route(async (req, res) => {
         exercises: (b.exercises || []).map(ex => ({
           name: ex.name,
           rest: ex.rest || 0,
+          note: ex.note || '',
           // Séries planifiées : objectif de reps, charges à remplir à la salle
           sets: Array.from({ length: ex.setsCount || 4 }, () => ({ reps: '', weight: '', target: ex.reps || '' }))
         }))
@@ -646,12 +652,12 @@ function csvCell(value) {
   return /[;"\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 function sessionsToCsv(sessions) {
-  const rows = [['Date', 'Séance', 'Terminée', 'Bloc', 'Exercice', 'Repos (s)', 'Série', 'Objectif', 'Reps', 'Poids (kg)', 'Validée']];
+  const rows = [['Date', 'Séance', 'Terminée', 'Bloc', 'Exercice', 'Repos (s)', 'Série', 'Objectif', 'Reps', 'Poids (kg)', 'Validée', 'Note']];
   [...sessions].sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(s => {
     (s.blocks || []).forEach(b => (b.exercises || []).forEach(ex => (ex.sets || []).forEach((set, i) => {
       rows.push([
         s.date, s.name, s.completed ? 'oui' : 'non', b.type === 'superset' ? 'superset' : 'simple',
-        ex.name, ex.rest || 0, i + 1, set.target || '', set.reps ?? '', set.weight ?? '', set.done ? 'oui' : 'non'
+        ex.name, ex.rest || 0, i + 1, set.target || '', set.reps ?? '', set.weight ?? '', set.done ? 'oui' : 'non', ex.note || ''
       ]);
     })));
   });

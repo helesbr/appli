@@ -115,6 +115,59 @@ function moveExercise(blocks, bi, ei, dir) {
   return { bi: neighbor, ei };
 }
 
+// Dernière note écrite sur cet exercice, avant cette séance : le rappel affiché à la salle
+function lastExerciseNote(sessions, name, beforeDate, excludeId) {
+  const key = exerciseKey(name);
+  if (!key) return null;
+  let best = null;
+  (sessions || []).forEach(s => {
+    if (s.id === excludeId || s.date > beforeDate) return;
+    (s.blocks || []).forEach(b => (b.exercises || []).forEach(ex => {
+      const note = String(ex.note ?? '').trim();
+      if (note && exerciseKey(ex.name) === key && (!best || s.date > best.date)) best = { date: s.date, note };
+    }));
+  });
+  return best;
+}
+
+function addDaysIso(iso, days) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return formatDate(new Date(y, m - 1, d + days));
+}
+// Copie prête à refaire : plan et notes conservés, résultats remis à zéro.
+// Ce qui a été réalisé devient l'objectif s'il n'y en avait pas.
+function duplicateSession(session, date) {
+  const copy = {
+    date,
+    name: session.name,
+    completed: false,
+    blocks: (session.blocks || []).map(b => ({
+      type: b.type,
+      exercises: (b.exercises || []).map(ex => ({
+        name: ex.name,
+        rest: ex.rest || 0,
+        note: ex.note || '',
+        sets: (ex.sets || []).map(set => ({
+          reps: '',
+          weight: '',
+          target: String(set.target || set.reps || ''),
+          done: false
+        }))
+      }))
+    }))
+  };
+  if (session.templateName) copy.templateName = session.templateName;
+  if (session.weekType) copy.weekType = session.weekType;
+  return copy;
+}
+function duplicateTemplate(tpl) {
+  return {
+    name: `${tpl.name} (copie)`,
+    weekType: tpl.weekType || '',
+    sessions: JSON.parse(JSON.stringify(tpl.sessions || []))
+  };
+}
+
 // --- FILE D'ATTENTE DES MODIFICATIONS ---
 // Une seule entrée par fiche : la dernière version remplace les précédentes
 function upsertOutboxItem(items, item) {
@@ -147,6 +200,6 @@ if (typeof module !== 'undefined') {
   module.exports = {
     getMonday, getWeekNumber, formatDate, frDate, escapeHtml, num, blankZero, sessionStats, sessionStatus,
     normalizeWeight, cleanWeightTyping, stepWeight, exerciseKey, buildExerciseNames, canonicalExerciseName,
-    moveExercise, upsertOutboxItem, removeOutboxItem, dueOutboxItems, applyOutbox
+    moveExercise, lastExerciseNote, addDaysIso, duplicateSession, duplicateTemplate, upsertOutboxItem, removeOutboxItem, dueOutboxItems, applyOutbox
   };
 }

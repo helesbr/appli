@@ -35,6 +35,7 @@ function renderWeek() {
           <span class="s-name">${escapeHtml(s.name)}</span>
           <span class="s-meta">${statusLabel}${st.exos} exo${st.exos>1?'s':''} · ${st.sets} séries</span>
         </div>
+        <button class="chip-copy" data-copy="${escapeHtml(s.id)}" aria-label="Dupliquer ${escapeHtml(s.name)}">${icon('copy','ic-sm')}</button>
         ${s.completed
           ? `<span class="s-done" title="Séance terminée">${icon('check','ic-sm')}</span>`
           : `<button class="chip-play" data-play="${escapeHtml(s.id)}" aria-label="Lancer la séance">${icon('play','ic-sm')}</button>`}
@@ -46,6 +47,8 @@ function renderWeek() {
     cell.onclick = (e) => {
       const play = e.target.closest('.chip-play');
       if (play) return openWorkout(play.dataset.play);
+      const copy = e.target.closest('.chip-copy');
+      if (copy) return openDuplicate(copy.dataset.copy);
       const dot = e.target.closest('.session-dot');
       if (dot) openEditSession(dot.dataset.id);
       else openNewSession(dateStr);
