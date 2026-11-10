@@ -300,8 +300,17 @@ app.use('/api', async (req, res, next) => {
   next();
 });
 
+// Clé d'export (variable EXPORT_KEY, 32 caractères minimum) : permet à une tâche automatique
+// de lire l'export sans se connecter. Elle n'ouvre que GET /api/export, en lecture seule.
+const EXPORT_KEY = (process.env.EXPORT_KEY || '').trim();
+function hasExportKey(req) {
+  const key = (req.get('X-Export-Key') || '').trim();
+  return EXPORT_KEY.length >= 32 && key !== '' && req.method === 'GET' && req.path === '/export' && safeEqual(key, EXPORT_KEY);
+}
+
 app.use('/api', async (req, res, next) => {
   try {
+    if (hasExportKey(req)) return next();
     const token = (req.get('Authorization') || '').replace(/^Bearer\s+/i, '');
     req.device = await authenticate(token);
     if (!req.device) return res.status(401).json({ error: 'Non autorisé', code: 'UNAUTHORIZED' });
