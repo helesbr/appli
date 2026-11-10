@@ -6,6 +6,7 @@ const path = require('node:path');
 const { loadServer } = require('../test-support/fake-mongo');
 
 const PASSWORD = 'mot-de-passe-test';
+const EXPORT_KEY = 'cle-export-test-0123456789abcdefghij';
 const realWebPush = require('web-push');
 const vapid = realWebPush.generateVAPIDKeys();
 const pushes = [];
@@ -44,7 +45,8 @@ test.before(async () => {
       VAPID_PRIVATE_KEY: vapid.privateKey,
       QSTASH_TOKEN: 'jeton-test',
       QSTASH_URL: `http://127.0.0.1:${qstash.address().port}`,
-      PUBLIC_URL: 'https://exemple.test'
+      PUBLIC_URL: 'https://exemple.test',
+      EXPORT_KEY: EXPORT_KEY
     }
   });
   ({ collections, state } = loaded);
@@ -268,6 +270,20 @@ test('export JSON complet et CSV lisible, sans formule exécutable', async () =>
   const text = buffer.toString('utf8');
   const line = text.split('\r\n').find(l => l.includes('poulie'));
   assert.strictEqual(line, `2026-05-01;'=HACK();non;simple;"Tirage; poulie";60;1;10;10;50.5;oui;`);
+});
+
+test('la clé d\'export ouvre seulement la lecture de l\'export', async () => {
+  const withKey = (method, url, key = EXPORT_KEY) => fetch(base + url, { method, headers: { 'X-Export-Key': key } });
+  const res = await withKey('GET', '/api/export');
+  assert.strictEqual(res.status, 200);
+  assert.ok(Array.isArray((await res.json()).sessions));
+  assert.strictEqual((await withKey('GET', '/api/export?format=csv')).status, 200);
+
+  assert.strictEqual((await withKey('GET', '/api/export', 'mauvaise-cle-0123456789abcdefghijkl')).status, 401);
+  for (const url of ['/api/sessions', '/api/templates', '/api/devices', '/api/top-perfs']) {
+    assert.strictEqual((await withKey('GET', url)).status, 401, url);
+  }
+  assert.strictEqual((await withKey('POST', '/api/devices/logout-all')).status, 401);
 });
 
 test('notification : programmée via QStash, envoyée une fois, annulable et remplaçable', async () => {
