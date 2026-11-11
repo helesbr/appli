@@ -339,6 +339,8 @@ app.get('/api/health', async (req, res) => {
     notifications: pushConfigured(),
     qstash,
     qstashToken: qstashTokenShape(QSTASH_TOKEN),
+    // Empreinte non réversible (8 caractères) : permet de comparer avec le jeton affiché sur Upstash
+    qstashTokenId: QSTASH_TOKEN ? crypto.createHash('sha256').update(QSTASH_TOKEN).digest('hex').slice(0, 8) : null,
     qstashRegion: qstash ? qstashRegionName(qstashBase) : null,
     recentErrors: 0
   };

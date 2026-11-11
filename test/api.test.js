@@ -369,7 +369,11 @@ test('état du serveur : public, sans détail, et en échec si la base tombe', a
   assert.strictEqual(body.ok, true);
   assert.deepStrictEqual(
     { ...body.checks, qstashRegion: undefined },
-    { database: true, password: true, notifications: true, qstash: true, qstashToken: 'mal formée', qstashRegion: undefined, recentErrors: 0 }
+    {
+      database: true, password: true, notifications: true, qstash: true, qstashToken: 'mal formée',
+      qstashTokenId: require('node:crypto').createHash('sha256').update('jeton-test').digest('hex').slice(0, 8),
+      qstashRegion: undefined, recentErrors: 0
+    }
   );
   assert.match(body.checks.qstashRegion, /^127\.0\.0\.1:\d+$/);
   assert.ok(!JSON.stringify(body).includes('jeton-test'));
