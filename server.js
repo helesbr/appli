@@ -233,8 +233,17 @@ app.post('/api/login', async (req, res, next) => {
 const VAPID_PUBLIC_KEY = (process.env.VAPID_PUBLIC_KEY || '').trim();
 const VAPID_PRIVATE_KEY = (process.env.VAPID_PRIVATE_KEY || '').trim();
 const VAPID_SUBJECT = (process.env.VAPID_SUBJECT || 'https://moggtrack.vercel.app').trim();
-const QSTASH_TOKEN = (process.env.QSTASH_TOKEN || '').trim();
-const QSTASH_URL = (process.env.QSTASH_URL || 'https://qstash.upstash.io').trim().replace(/\/+$/, '');
+// Tolère les erreurs de copier-coller depuis le bloc .env d'Upstash :
+// « QSTASH_TOKEN="…" », guillemets, espaces ou retours à la ligne en trop
+function cleanEnvValue(raw, name) {
+  return String(raw || '')
+    .trim()
+    .replace(new RegExp(`^${name}\\s*=\\s*`, 'i'), '')
+    .replace(/^["']+|["']+$/g, '')
+    .replace(/\s+/g, '');
+}
+const QSTASH_TOKEN = cleanEnvValue(process.env.QSTASH_TOKEN, 'QSTASH_TOKEN');
+const QSTASH_URL = (cleanEnvValue(process.env.QSTASH_URL, 'QSTASH_URL') || 'https://qstash.upstash.io').replace(/\/+$/, '');
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
 const pushConfigured = () => !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && QSTASH_TOKEN);
 
@@ -270,8 +279,26 @@ app.post('/api/rest-timer/:id/fire', async (req, res) => {
 // --- ÉTAT DU SERVEUR ---
 // Public et sans donnée personnelle : surveillé chaque heure par .github/workflows/health.yml
 const HEALTH_MAX_RECENT_ERRORS = 3;
+// Le jeton QStash est vérifié par une simple lecture (aucun message envoyé), au plus toutes les 5 min
+const QSTASH_CHECK_MS = 5 * 60 * 1000;
+let qstashCheck = { at: 0, ok: null };
+async function qstashTokenWorks() {
+  if (!QSTASH_TOKEN) return false;
+  if (Date.now() - qstashCheck.at < QSTASH_CHECK_MS) return qstashCheck.ok;
+  try {
+    const res = await fetch(`${QSTASH_URL}/v2/schedules`, {
+      headers: { Authorization: `Bearer ${QSTASH_TOKEN}` },
+      signal: AbortSignal.timeout(5000)
+    });
+    qstashCheck = { at: Date.now(), ok: res.ok };
+  } catch (e) {
+    // QStash injoignable : on ne conclut pas que le jeton est faux, on retentera
+    return null;
+  }
+  return qstashCheck.ok;
+}
 app.get('/api/health', async (req, res) => {
-  const checks = { database: false, password: !!APP_PASSWORD, notifications: pushConfigured(), recentErrors: 0 };
+  const checks = { database: false, password: !!APP_PASSWORD, notifications: pushConfigured(), qstash: await qstashTokenWorks(), recentErrors: 0 };
   try {
     await ensureMongo();
     await db.command({ ping: 1 });
@@ -280,7 +307,8 @@ app.get('/api/health', async (req, res) => {
   } catch (e) {
     console.error('Contrôle de santé :', e.message);
   }
-  const ok = checks.database && checks.password && checks.notifications && checks.recentErrors < HEALTH_MAX_RECENT_ERRORS;
+  const ok = checks.database && checks.password && checks.notifications && checks.qstash !== false
+    && checks.recentErrors < HEALTH_MAX_RECENT_ERRORS;
   res.setHeader('Cache-Control', 'no-store');
   res.status(ok ? 200 : 503).json({ ok, checks });
 });
@@ -712,3 +740,4 @@ if (require.main === module) {
 
 module.exports = app;
 module.exports.sessionDay = sessionDay;
+module.exports.cleanEnvValue = cleanEnvValue;

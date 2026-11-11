@@ -21,6 +21,11 @@ const fakeWebPush = {
 const published = [];
 let qstashStatus = 200;
 const qstash = http.createServer((req, res) => {
+  if (req.method === 'GET') {
+    // Vérification du jeton par le contrôle de santé
+    res.statusCode = req.headers.authorization === 'Bearer jeton-test' ? 200 : 401;
+    return res.end('[]');
+  }
   published.push({ url: req.url, auth: req.headers.authorization, delay: req.headers['upstash-delay'] });
   res.statusCode = qstashStatus;
   res.end(qstashStatus === 200 ? '{}' : JSON.stringify({ error: 'invalid token' }));
@@ -43,7 +48,7 @@ test.before(async () => {
       LOGIN_DELAY_MS: '1',
       VAPID_PUBLIC_KEY: vapid.publicKey,
       VAPID_PRIVATE_KEY: vapid.privateKey,
-      QSTASH_TOKEN: 'jeton-test',
+      QSTASH_TOKEN: ' QSTASH_TOKEN="jeton-test"\n',
       QSTASH_URL: `http://127.0.0.1:${qstash.address().port}`,
       PUBLIC_URL: 'https://exemple.test',
       EXPORT_KEY: EXPORT_KEY
@@ -338,11 +343,20 @@ test('notification : refus de QStash signalé à l\'appli', async () => {
   assert.strictEqual((await call('POST', '/api/rest-timer', { token, body: { seconds: 60, subscription: { endpoint: 'http://x' } } })).status, 400);
 });
 
+test('les valeurs collées avec QSTASH_TOKEN=, guillemets ou espaces sont nettoyées', () => {
+  const { cleanEnvValue } = require('../server.js');
+  assert.strictEqual(cleanEnvValue('QSTASH_TOKEN="abc="', 'QSTASH_TOKEN'), 'abc=');
+  assert.strictEqual(cleanEnvValue('  "abc"\n', 'QSTASH_TOKEN'), 'abc');
+  assert.strictEqual(cleanEnvValue("'abc'", 'QSTASH_TOKEN'), 'abc');
+  assert.strictEqual(cleanEnvValue('qstash_url = "https://x.io"', 'QSTASH_URL'), 'https://x.io');
+  assert.strictEqual(cleanEnvValue(undefined, 'QSTASH_TOKEN'), '');
+});
+
 test('état du serveur : public, sans détail, et en échec si la base tombe', async () => {
   collections.appErrors.docs = [];
   const ok = await call('GET', '/api/health');
   assert.strictEqual(ok.status, 200);
-  assert.deepStrictEqual(await ok.json(), { ok: true, checks: { database: true, password: true, notifications: true, recentErrors: 0 } });
+  assert.deepStrictEqual(await ok.json(), { ok: true, checks: { database: true, password: true, notifications: true, qstash: true, recentErrors: 0 } });
 
   state.down = true;
   const down = await call('GET', '/api/health');
