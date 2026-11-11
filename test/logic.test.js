@@ -122,6 +122,18 @@ test('dupliquer une semaine type crée une copie indépendante', () => {
   assert.strictEqual(tpl.sessions[0].name, 'A');
 });
 
+test('un exercice ajouté à un superset reprend le nombre de séries des autres', () => {
+  const block = { type: 'superset', exercises: [logic.emptyExercise(3), logic.emptyExercise(4)] };
+  assert.strictEqual(logic.addExerciseToBlock(block), 2);
+  assert.strictEqual(block.exercises[2].sets.length, 4);
+  assert.deepStrictEqual(block.exercises[2].sets[0], { reps: '', weight: '', target: '', done: false });
+  assert.strictEqual(logic.emptyExercise().sets.length, 1);
+  assert.strictEqual(logic.emptyExercise(0).sets.length, 1);
+  const empty = { type: 'superset', exercises: [] };
+  logic.addExerciseToBlock(empty);
+  assert.strictEqual(empty.exercises[0].sets.length, 1);
+});
+
 test('la file d\'attente ne garde que la dernière version d\'une fiche', () => {
   let items = logic.upsertOutboxItem([], { kind: 'sessions', id: 'a', op: 'save', rev: 1 });
   items = logic.upsertOutboxItem(items, { kind: 'sessions', id: 'b', op: 'save', rev: 2 });

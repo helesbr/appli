@@ -168,6 +168,22 @@ function duplicateTemplate(tpl) {
   };
 }
 
+// Exercice vide prêt à remplir en séance
+function emptyExercise(setsCount = 1) {
+  return {
+    name: '',
+    rest: 0,
+    note: '',
+    sets: Array.from({ length: Math.max(1, setsCount) }, () => ({ reps: '', weight: '', target: '', done: false }))
+  };
+}
+// Un exercice ajouté à un superset reprend le nombre de séries des autres (on enchaîne les tours)
+function addExerciseToBlock(block) {
+  const setsCount = Math.max(1, ...(block.exercises || []).map(ex => (ex.sets || []).length));
+  block.exercises.push(emptyExercise(setsCount));
+  return block.exercises.length - 1;
+}
+
 // --- FILE D'ATTENTE DES MODIFICATIONS ---
 // Une seule entrée par fiche : la dernière version remplace les précédentes
 function upsertOutboxItem(items, item) {
@@ -200,6 +216,6 @@ if (typeof module !== 'undefined') {
   module.exports = {
     getMonday, getWeekNumber, formatDate, frDate, escapeHtml, num, blankZero, sessionStats, sessionStatus,
     normalizeWeight, cleanWeightTyping, stepWeight, exerciseKey, buildExerciseNames, canonicalExerciseName,
-    moveExercise, lastExerciseNote, addDaysIso, duplicateSession, duplicateTemplate, upsertOutboxItem, removeOutboxItem, dueOutboxItems, applyOutbox
+    moveExercise, emptyExercise, addExerciseToBlock, lastExerciseNote, addDaysIso, duplicateSession, duplicateTemplate, upsertOutboxItem, removeOutboxItem, dueOutboxItems, applyOutbox
   };
 }

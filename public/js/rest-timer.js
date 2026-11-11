@@ -10,6 +10,7 @@ function unlockAudio() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    prepareCustomSound();
   } catch (e) {}
 }
 function beep() {
@@ -151,6 +152,32 @@ async function showRestNotification(label) {
   } catch (e) {}
 }
 
+// Notification d'essai dans 10 s : permet de vérifier l'écran verrouillé sans attendre un repos.
+// Doit partir d'un geste de l'utilisateur (obligatoire sur iPhone).
+async function testRestNotification(button) {
+  if (!pushSupported()) {
+    toast('Sur iPhone : ajoute l\'appli à l\'écran d\'accueil et ouvre-la depuis son icône', 'error');
+    return;
+  }
+  button.disabled = true;
+  try {
+    const result = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    if (result !== 'granted') {
+      toast('Notifications bloquées : autorise-les dans les réglages du téléphone', 'error');
+      return;
+    }
+    const sub = await getPushSubscription(true);
+    if (!sub) throw new Error('rouvre l\'appli puis réessaie');
+    await api('/api/rest-timer', { method: 'POST', body: { seconds: 10, label: 'Test', subscription: sub.toJSON() } });
+    updateRestBell();
+    toast('Verrouille ton téléphone maintenant : la notification arrive dans 10 s');
+  } catch (e) {
+    if (!e.silent) toast('Test impossible : ' + e.message, 'error');
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function startRest(seconds, label) {
   stopRest();
   closeRestNotification().catch(() => {});
@@ -175,7 +202,7 @@ function tickRest() {
     restEl.classList.add('finished');
     document.getElementById('rtLabel').textContent = 'Repos terminé · c\'est reparti !';
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    beep();
+    playRestSound();
     if (document.hidden) showRestNotification(rest.label);
     const ended = rest;
     setTimeout(() => {
