@@ -279,26 +279,69 @@ app.post('/api/rest-timer/:id/fire', async (req, res) => {
 // --- ÉTAT DU SERVEUR ---
 // Public et sans donnée personnelle : surveillé chaque heure par .github/workflows/health.yml
 const HEALTH_MAX_RECENT_ERRORS = 3;
-// Le jeton QStash est vérifié par une simple lecture (aucun message envoyé), au plus toutes les 5 min
+// Le jeton QStash est vérifié par une simple lecture (aucun message envoyé), au plus toutes les 5 min.
+// Un jeton ne marche que dans sa région : si QSTASH_URL le refuse, les autres régions sont essayées
+// et la première qui l'accepte sert ensuite à programmer les notifications.
 const QSTASH_CHECK_MS = 5 * 60 * 1000;
+const QSTASH_REGION_URLS = (process.env.QSTASH_REGION_URLS ||
+  'https://qstash-eu-central-1.upstash.io,https://qstash-us-east-1.upstash.io,https://qstash.upstash.io')
+  .split(',').map(u => u.trim().replace(/\/+$/, '')).filter(Boolean);
 let qstashCheck = { at: 0, ok: null };
-async function qstashTokenWorks() {
-  if (!QSTASH_TOKEN) return false;
-  if (Date.now() - qstashCheck.at < QSTASH_CHECK_MS) return qstashCheck.ok;
+let qstashBase = QSTASH_URL;
+
+// Forme attendue : base64 d'un JSON { UserID, Password }. On n'en révèle jamais le contenu.
+function qstashTokenShape(token) {
+  if (!token) return 'absent';
   try {
-    const res = await fetch(`${QSTASH_URL}/v2/schedules`, {
-      headers: { Authorization: `Bearer ${QSTASH_TOKEN}` },
-      signal: AbortSignal.timeout(5000)
-    });
-    qstashCheck = { at: Date.now(), ok: res.ok };
+    const json = JSON.parse(Buffer.from(token, 'base64').toString('utf8'));
+    return json && json.UserID && json.Password ? 'valide' : 'inattendue';
   } catch (e) {
-    // QStash injoignable : on ne conclut pas que le jeton est faux, on retentera
-    return null;
+    return 'mal formée';
   }
-  return qstashCheck.ok;
+}
+function qstashRegionName(base) {
+  const host = new URL(base).host;
+  const match = host.match(/^qstash-([a-z0-9-]+)\.upstash\.io$/);
+  if (match) return match[1];
+  return host === 'qstash.upstash.io' ? 'globale' : host;
+}
+async function qstashTokenWorks(force) {
+  if (!QSTASH_TOKEN) return false;
+  if (!force && Date.now() - qstashCheck.at < QSTASH_CHECK_MS) return qstashCheck.ok;
+  let reached = false;
+  for (const base of [QSTASH_URL, ...QSTASH_REGION_URLS.filter(u => u !== QSTASH_URL)]) {
+    try {
+      const res = await fetch(`${base}/v2/schedules`, {
+        headers: { Authorization: `Bearer ${QSTASH_TOKEN}` },
+        signal: AbortSignal.timeout(5000)
+      });
+      reached = true;
+      if (res.ok) {
+        if (base !== qstashBase) console.warn(`QStash : jeton accepté par ${base} (QSTASH_URL = ${QSTASH_URL})`);
+        qstashBase = base;
+        qstashCheck = { at: Date.now(), ok: true };
+        return true;
+      }
+    } catch (e) {
+      // Région injoignable : on passe à la suivante
+    }
+  }
+  // QStash totalement injoignable : on ne conclut pas que le jeton est faux, on retentera
+  if (!reached) return null;
+  qstashCheck = { at: Date.now(), ok: false };
+  return false;
 }
 app.get('/api/health', async (req, res) => {
-  const checks = { database: false, password: !!APP_PASSWORD, notifications: pushConfigured(), qstash: await qstashTokenWorks(), recentErrors: 0 };
+  const qstash = await qstashTokenWorks();
+  const checks = {
+    database: false,
+    password: !!APP_PASSWORD,
+    notifications: pushConfigured(),
+    qstash,
+    qstashToken: qstashTokenShape(QSTASH_TOKEN),
+    qstashRegion: qstash ? qstashRegionName(qstashBase) : null,
+    recentErrors: 0
+  };
   try {
     await ensureMongo();
     await db.command({ ping: 1 });
@@ -615,7 +658,9 @@ app.post('/api/rest-timer', route(async (req, res) => {
 
   const proto = req.get('x-forwarded-proto') || req.protocol;
   const origin = PUBLIC_URL || `${proto}://${req.get('host')}`;
-  const scheduled = await fetch(`${QSTASH_URL}/v2/publish/${origin}/api/rest-timer/${id}/fire`, {
+  // Utilise la région qui accepte le jeton (déterminée une fois, puis gardée en mémoire)
+  await qstashTokenWorks();
+  const scheduled = await fetch(`${qstashBase}/v2/publish/${origin}/api/rest-timer/${id}/fire`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${QSTASH_TOKEN}`,
@@ -627,6 +672,7 @@ app.post('/api/rest-timer', route(async (req, res) => {
     await restTimersCol.deleteOne({ id });
     const text = (await scheduled.text()).slice(0, 200);
     reportError('qstash', `${scheduled.status} ${text}`);
+    if (scheduled.status === 401) qstashCheck.at = 0; // jeton changé ou révoqué : on revérifiera
     // La raison donnée par QStash (ex. « invalid token ») aide à corriger la configuration sur Vercel
     let reason = text;
     try { reason = JSON.parse(text).error || text; } catch (e) {}
@@ -741,3 +787,4 @@ if (require.main === module) {
 module.exports = app;
 module.exports.sessionDay = sessionDay;
 module.exports.cleanEnvValue = cleanEnvValue;
+module.exports.qstashTokenShape = qstashTokenShape;
