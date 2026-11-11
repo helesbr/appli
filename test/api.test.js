@@ -343,6 +343,15 @@ test('notification : refus de QStash signalé à l\'appli', async () => {
   assert.strictEqual((await call('POST', '/api/rest-timer', { token, body: { seconds: 60, subscription: { endpoint: 'http://x' } } })).status, 400);
 });
 
+test('la forme du jeton QStash est reconnue sans en révéler le contenu', () => {
+  const { qstashTokenShape } = require('../server.js');
+  const real = Buffer.from(JSON.stringify({ UserID: 'u', Password: 'p' })).toString('base64');
+  assert.strictEqual(qstashTokenShape(real), 'valide');
+  assert.strictEqual(qstashTokenShape('******'), 'mal formée');
+  assert.strictEqual(qstashTokenShape(Buffer.from('{"a":1}').toString('base64')), 'inattendue');
+  assert.strictEqual(qstashTokenShape(''), 'absent');
+});
+
 test('les valeurs collées avec QSTASH_TOKEN=, guillemets ou espaces sont nettoyées', () => {
   const { cleanEnvValue } = require('../server.js');
   assert.strictEqual(cleanEnvValue('QSTASH_TOKEN="abc="', 'QSTASH_TOKEN'), 'abc=');
@@ -356,7 +365,14 @@ test('état du serveur : public, sans détail, et en échec si la base tombe', a
   collections.appErrors.docs = [];
   const ok = await call('GET', '/api/health');
   assert.strictEqual(ok.status, 200);
-  assert.deepStrictEqual(await ok.json(), { ok: true, checks: { database: true, password: true, notifications: true, qstash: true, recentErrors: 0 } });
+  const body = await ok.json();
+  assert.strictEqual(body.ok, true);
+  assert.deepStrictEqual(
+    { ...body.checks, qstashRegion: undefined },
+    { database: true, password: true, notifications: true, qstash: true, qstashToken: 'mal formée', qstashRegion: undefined, recentErrors: 0 }
+  );
+  assert.match(body.checks.qstashRegion, /^127\.0\.0\.1:\d+$/);
+  assert.ok(!JSON.stringify(body).includes('jeton-test'));
 
   state.down = true;
   const down = await call('GET', '/api/health');
