@@ -40,6 +40,26 @@ test('un push vide ou illisible affiche quand même une notification (exigé par
   assert.strictEqual((await push({ json: () => { throw new Error('illisible'); } })).length, 1);
 });
 
+test('une mise à jour de l\'appli garde le son choisi', async () => {
+  const deleted = [];
+  const listeners = {};
+  const self = {
+    addEventListener: (type, fn) => { listeners[type] = fn; },
+    location: { origin: 'https://moggtrack.test' },
+    clients: { claim: async () => {} },
+    registration: {}
+  };
+  const caches = {
+    keys: async () => ['moggtrack-shell-v1', 'moggtrack-sound', 'moggtrack-api'],
+    delete: async key => { deleted.push(key); }
+  };
+  vm.runInNewContext(source, { self, URL, Promise, console, caches, Request: class {}, fetch: async () => ({}) });
+  let waited;
+  listeners.activate({ waitUntil: p => { waited = p; } });
+  await waited;
+  assert.deepStrictEqual(deleted, ['moggtrack-shell-v1']);
+});
+
 test('le fonctionnement hors connexion ne garde que les données utiles', () => {
   const { listeners } = loadWorker();
   const respondsTo = pathname => {

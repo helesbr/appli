@@ -52,7 +52,8 @@ function renderWorkout() {
   w.blocks.forEach((block, bi) => {
     const bDiv = document.createElement('div');
     bDiv.className = 'block-wrapper' + (block.type === 'superset' ? ' superset' : '');
-    if (block.type === 'superset') bDiv.innerHTML = `<div class="block-header"><span class="block-tag">${icon('zap')}Superset</span></div>`;
+    if (block.type === 'superset') bDiv.innerHTML = `<div class="block-header"><span class="block-tag">${icon('zap')}Superset</span>
+      <button class="btn btn-violet btn-sm" data-block-act="add-exo" data-b="${bi}">${icon('plus','ic-sm')}Exo</button></div>`;
     (block.exercises||[]).forEach((ex, ei) => {
       ex.sets = ex.sets || [];
       const last = lastPerformance(ex.name, w.date, w.id);
@@ -156,7 +157,24 @@ wkBody.addEventListener('input', e => {
   else t.set[field] = field === 'weight' ? normalizeWeight(e.target.value) : e.target.value;
   saveWorkout();
 });
+// Focus sur le nom du dernier exercice ajouté, pour le taper tout de suite
+function focusExerciseName(bi, ei) {
+  const input = wkBody.querySelector(`.wk-exo[data-b="${bi}"][data-e="${ei}"] .wk-exo-name`);
+  if (!input) return;
+  input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  input.focus();
+}
+
 wkBody.addEventListener('click', e => {
+  const blockBtn = e.target.closest('[data-block-act]');
+  if (blockBtn && workout) {
+    const bi = +blockBtn.dataset.b;
+    const ei = addExerciseToBlock(workout.blocks[bi]);
+    renderWorkout();
+    saveWorkout();
+    focusExerciseName(bi, ei);
+    return;
+  }
   const btn = e.target.closest('[data-act]');
   if (!btn || !workout) return;
   const t = wkLocate(btn);
@@ -218,13 +236,17 @@ document.addEventListener('visibilitychange', () => {
 });
 
 document.getElementById('wkAddExo').onclick = () => {
-  workout.blocks.push({ type: 'single', exercises: [{ name: '', rest: 0, sets: [{ reps: '', weight: '', target: '', done: false }] }] });
+  workout.blocks.push({ type: 'single', exercises: [emptyExercise()] });
   renderWorkout();
   saveWorkout();
-  const names = wkBody.querySelectorAll('.wk-exo-name');
-  const input = names[names.length - 1];
-  input.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  input.focus();
+  focusExerciseName(workout.blocks.length - 1, 0);
+};
+// Superset ajouté en pleine séance : deux exercices à enchaîner, avec 3 tours par défaut
+document.getElementById('wkAddSuperset').onclick = () => {
+  workout.blocks.push({ type: 'superset', exercises: [emptyExercise(3), emptyExercise(3)] });
+  renderWorkout();
+  saveWorkout();
+  focusExerciseName(workout.blocks.length - 1, 0);
 };
 
 document.getElementById('wkBack').onclick = () => {

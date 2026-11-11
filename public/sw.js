@@ -1,6 +1,6 @@
 // Service worker MoggTrack : l'appli s'ouvre même hors connexion,
 // avec les dernières données consultées.
-const SHELL_CACHE = 'moggtrack-shell-v5';
+const SHELL_CACHE = 'moggtrack-shell-v6';
 const API_CACHE = 'moggtrack-api';
 const FONT_CACHE = 'moggtrack-fonts';
 const SHELL = [
@@ -11,6 +11,7 @@ const SHELL = [
   '/js/suggestions.js',
   '/js/auth.js',
   '/js/rest-timer.js',
+  '/js/sound.js',
   '/js/calendar.js',
   '/js/session-form.js',
   '/js/duplicate.js',
@@ -31,7 +32,8 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  const keep = [SHELL_CACHE, API_CACHE, FONT_CACHE];
+  // Le son choisi par l'utilisateur est gardé d'une version à l'autre
+  const keep = [SHELL_CACHE, API_CACHE, FONT_CACHE, 'moggtrack-sound'];
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => !keep.includes(k)).map(k => caches.delete(k))))
