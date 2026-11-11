@@ -597,8 +597,13 @@ app.post('/api/rest-timer', route(async (req, res) => {
   });
   if (!scheduled.ok) {
     await restTimersCol.deleteOne({ id });
-    reportError('qstash', `${scheduled.status} ${(await scheduled.text()).slice(0, 200)}`);
-    return res.status(502).json({ error: 'programmation refusée par QStash' });
+    const text = (await scheduled.text()).slice(0, 200);
+    reportError('qstash', `${scheduled.status} ${text}`);
+    // La raison donnée par QStash (ex. « invalid token ») aide à corriger la configuration sur Vercel
+    let reason = text;
+    try { reason = JSON.parse(text).error || text; } catch (e) {}
+    reason = String(reason).replace(/[A-Za-z0-9_=-]{24,}/g, '…').slice(0, 120);
+    return res.status(502).json({ error: `programmation refusée par QStash (${scheduled.status}${reason ? ' : ' + reason : ''})` });
   }
   res.status(201).json({ id });
 }));

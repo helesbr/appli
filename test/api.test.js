@@ -23,7 +23,7 @@ let qstashStatus = 200;
 const qstash = http.createServer((req, res) => {
   published.push({ url: req.url, auth: req.headers.authorization, delay: req.headers['upstash-delay'] });
   res.statusCode = qstashStatus;
-  res.end('{}');
+  res.end(qstashStatus === 200 ? '{}' : JSON.stringify({ error: 'invalid token' }));
 });
 
 let base, server, collections, state;
@@ -334,7 +334,7 @@ test('notification : refus de QStash signalé à l\'appli', async () => {
   const res = await call('POST', '/api/rest-timer', { token, body: { seconds: 60, subscription } });
   qstashStatus = 200;
   assert.strictEqual(res.status, 502);
-  assert.match((await res.json()).error, /QStash/);
+  assert.match((await res.json()).error, /QStash \(401 : invalid token\)/);
   assert.strictEqual((await call('POST', '/api/rest-timer', { token, body: { seconds: 60, subscription: { endpoint: 'http://x' } } })).status, 400);
 });
 
