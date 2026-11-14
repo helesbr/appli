@@ -7,12 +7,14 @@ function openNewSession(date) {
   document.getElementById('blockList').innerHTML = '';
   document.getElementById('deleteSessionBtn').hidden = true;
   document.getElementById('duplicateSessionBtn').hidden = true;
+  document.getElementById('sessionKindSwitch').hidden = false;
   addBlockUI('single');
   openModal('sessionModal');
 }
 function openEditSession(id) {
   const session = sessions.find(s=>s.id===id);
   if (!session) return;
+  if (isRun(session)) return openEditRun(id);
   editingSessionId = id;
   document.getElementById('modalTitle').textContent = 'Modifier la séance';
   document.getElementById('sessionDate').value = session.date;
@@ -20,6 +22,7 @@ function openEditSession(id) {
   document.getElementById('blockList').innerHTML = '';
   document.getElementById('deleteSessionBtn').hidden = false;
   document.getElementById('duplicateSessionBtn').hidden = false;
+  document.getElementById('sessionKindSwitch').hidden = true;
   (session.blocks||[]).forEach(b => addBlockUI(b.type, b.exercises));
   openModal('sessionModal');
 }

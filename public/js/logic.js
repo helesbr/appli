@@ -134,9 +134,94 @@ function addDaysIso(iso, days) {
   const [y, m, d] = iso.split('-').map(Number);
   return formatDate(new Date(y, m - 1, d + days));
 }
+// --- COURSE À PIED ---
+const RUN_TYPES = { footing: 'Footing', fractionne: 'Fractionné', longue: 'Sortie longue', tempo: 'Tempo', course: 'Course', autre: 'Autre' };
+const RUN_FEELINGS = ['', 'Très dur', 'Dur', 'Correct', 'Bien', 'Excellent'];
+function isRun(s) { return !!s && s.kind === 'run'; }
+
+// « 45 » (minutes), « 45:30 », « 1:02:10 », « 1h05 » → secondes ; NaN si illisible, 0 si vide
+function parseDuration(text) {
+  const t = String(text ?? '').trim().toLowerCase().replace(/\s+/g, '');
+  if (!t) return 0;
+  let m = t.match(/^(\d+)h(\d{1,2})?(?:min|m)?$/);
+  if (m) return Number(m[1]) * 3600 + Number(m[2] || 0) * 60;
+  m = t.match(/^(\d+)(?:min|m)?$/);
+  if (m) return Number(m[1]) * 60;
+  const parts = t.split(':');
+  if (parts.length > 3 || parts.some(p => !/^\d+$/.test(p))) return NaN;
+  if (parts.slice(1).some(p => Number(p) >= 60)) return NaN;
+  return parts.map(Number).reduce((total, n) => total * 60 + n, 0);
+}
+// 2580 → « 43:00 », 3730 → « 1:02:10 » ; vide si 0
+function formatDuration(sec) {
+  const total = Math.round(num(sec));
+  if (total <= 0) return '';
+  const h = Math.floor(total / 3600), m = Math.floor(total % 3600 / 60), s = total % 60;
+  const ss = String(s).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+// Allure en secondes par km (0 si incalculable) et son affichage « 5:13 »
+function paceSeconds(distanceKm, durationSec) {
+  const d = num(distanceKm), t = num(durationSec);
+  return d > 0 && t > 0 ? t / d : 0;
+}
+function formatPace(secPerKm) {
+  const total = Math.round(num(secPerKm));
+  return total > 0 ? `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}` : '';
+}
+function formatKm(km) {
+  return num(km).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+}
+// Résumé court d'une course pour le planning : réalisé s'il existe, sinon l'objectif
+function runSummary(run) {
+  const r = run || {};
+  if (num(r.distanceKm) > 0 || num(r.durationSec) > 0) {
+    const pace = formatPace(paceSeconds(r.distanceKm, r.durationSec));
+    return [num(r.distanceKm) > 0 && `${formatKm(r.distanceKm)} km`, formatDuration(r.durationSec), pace && `${pace} /km`]
+      .filter(Boolean).join(' · ');
+  }
+  const t = r.target || {};
+  const goal = [num(t.distanceKm) > 0 && `${formatKm(t.distanceKm)} km`, formatDuration(t.durationSec)].filter(Boolean).join(' · ');
+  return goal ? `Objectif ${goal}` : (t.details || RUN_TYPES[r.type] || 'Course');
+}
+// Records et totaux de course, calculés sur les courses avec une distance
+function runRecords(sessions, today) {
+  const runs = (sessions || []).filter(s => isRun(s) && s.run && num(s.run.distanceKm) > 0);
+  const best = (list, score) => list.reduce((top, s) => (!top || score(s) > score(top) ? s : top), null);
+  const monday = formatDate(getMonday(new Date(today + 'T12:00:00')));
+  const sunday = addDaysIso(monday, 6);
+  const sum = list => Math.round(list.reduce((total, s) => total + num(s.run.distanceKm), 0) * 100) / 100;
+  return {
+    longest: best(runs, s => num(s.run.distanceKm)),
+    // Allure : seulement sur 3 km ou plus, sinon un sprint fausserait le record
+    fastest: best(runs.filter(s => num(s.run.distanceKm) >= 3 && num(s.run.durationSec) > 0), s => -paceSeconds(s.run.distanceKm, s.run.durationSec)),
+    climb: best(runs.filter(s => num(s.run.elevation) > 0), s => num(s.run.elevation)),
+    weekKm: sum(runs.filter(s => s.date >= monday && s.date <= sunday)),
+    monthKm: sum(runs.filter(s => s.date.slice(0, 7) === today.slice(0, 7))),
+    yearKm: sum(runs.filter(s => s.date.slice(0, 4) === today.slice(0, 4))),
+    recent: [...runs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10)
+  };
+}
+
 // Copie prête à refaire : plan et notes conservés, résultats remis à zéro.
 // Ce qui a été réalisé devient l'objectif s'il n'y en avait pas.
 function duplicateSession(session, date) {
+  if (isRun(session)) {
+    const r = session.run || {};
+    const t = r.target || {};
+    const run = {
+      type: r.type || 'footing',
+      target: {
+        distanceKm: num(t.distanceKm) || num(r.distanceKm),
+        durationSec: num(t.durationSec) || num(r.durationSec),
+        details: t.details || ''
+      }
+    };
+    const copy = { date, name: session.name, completed: false, kind: 'run', blocks: [], run };
+    if (session.templateName) copy.templateName = session.templateName;
+    if (session.weekType) copy.weekType = session.weekType;
+    return copy;
+  }
   const copy = {
     date,
     name: session.name,
@@ -216,6 +301,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     getMonday, getWeekNumber, formatDate, frDate, escapeHtml, num, blankZero, sessionStats, sessionStatus,
     normalizeWeight, cleanWeightTyping, stepWeight, exerciseKey, buildExerciseNames, canonicalExerciseName,
-    moveExercise, emptyExercise, addExerciseToBlock, lastExerciseNote, addDaysIso, duplicateSession, duplicateTemplate, upsertOutboxItem, removeOutboxItem, dueOutboxItems, applyOutbox
+    moveExercise, emptyExercise, addExerciseToBlock, lastExerciseNote, addDaysIso, duplicateSession, duplicateTemplate, upsertOutboxItem, removeOutboxItem, dueOutboxItems, applyOutbox,
+    RUN_TYPES, isRun, parseDuration, formatDuration, paceSeconds, formatPace, formatKm, runSummary, runRecords
   };
 }

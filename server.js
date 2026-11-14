@@ -58,7 +58,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // --- BASE DE DONNÉES ---
-let db, sessionsCol, templatesCol, restTimersCol, devicesCol, loginAttemptsCol, appErrorsCol;
+let db, sessionsCol, templatesCol, restTimersCol, devicesCol, loginAttemptsCol, appErrorsCol, integrationsCol;
 
 async function connectMongo() {
   if (!MONGODB_URI) throw new Error('Variable MONGODB_URI manquante ou vide');
@@ -74,6 +74,7 @@ async function connectMongo() {
   devicesCol = db.collection('devices');
   loginAttemptsCol = db.collection('loginAttempts');
   appErrorsCol = db.collection('appErrors');
+  integrationsCol = db.collection('integrations');
   await ensureIndexes();
   console.log('Connecté à MongoDB Atlas');
 }
@@ -89,6 +90,9 @@ async function ensureIndexes() {
     [devicesCol, { id: 1 }, { unique: true, name: 'id_unique' }],
     [loginAttemptsCol, { key: 1 }, { unique: true, name: 'key_unique' }],
     [appErrorsCol, { at: 1 }, { name: 'at_asc' }],
+    [integrationsCol, { id: 1 }, { unique: true, name: 'id_unique' }],
+    // Une activité Strava n'est importée qu'une fois, même si deux synchronisations se croisent
+    [sessionsCol, { 'run.stravaId': 1 }, { unique: true, name: 'strava_id_unique', partialFilterExpression: { 'run.stravaId': { $type: 'string' } } }],
     // Mongo supprime seul ces documents une fois périmés
     [restTimersCol, { expireAt: 1 }, { expireAfterSeconds: 0, name: 'expire_at' }],
     [devicesCol, { expireAt: 1 }, { expireAfterSeconds: 0, name: 'expire_at' }],
@@ -373,6 +377,93 @@ app.use('/api', async (req, res, next) => {
   next();
 });
 
+// --- STRAVA ---
+// Les courses enregistrées sur Strava (téléphone ou Apple Watch) arrivent dans l'appli.
+// Les jetons Strava restent sur le serveur : le téléphone ne les voit jamais.
+const STRAVA_CLIENT_ID = cleanEnvValue(process.env.STRAVA_CLIENT_ID, 'STRAVA_CLIENT_ID');
+const STRAVA_CLIENT_SECRET = cleanEnvValue(process.env.STRAVA_CLIENT_SECRET, 'STRAVA_CLIENT_SECRET');
+const STRAVA_URL = (process.env.STRAVA_URL || 'https://www.strava.com').trim().replace(/\/+$/, '');
+const STRAVA_SCOPE = 'read,activity:read_all';
+const STRAVA_STATE_MS = 15 * 60 * 1000;
+const STRAVA_SYNC_MIN_MS = 3 * 60 * 1000;     // synchronisation automatique au plus toutes les 3 min
+const STRAVA_FIRST_SYNC_DAYS = 60;             // première synchronisation : les 2 derniers mois
+const STRAVA_OVERLAP_S = 3 * 24 * 3600;        // une activité envoyée en retard est quand même vue
+const STRAVA_RUN_SPORTS = ['Run', 'TrailRun', 'VirtualRun'];
+const stravaConfigured = () => !!(STRAVA_CLIENT_ID && STRAVA_CLIENT_SECRET);
+
+function publicOrigin(req) {
+  const proto = req.get('x-forwarded-proto') || req.protocol;
+  return PUBLIC_URL || `${proto}://${req.get('host')}`;
+}
+// Le paramètre « state » prouve que la demande vient de l'appli (connectée) et qu'elle est récente
+function stravaState() {
+  const exp = String(Date.now() + STRAVA_STATE_MS);
+  return `${exp}.${signToken(`strava:${exp}`)}`;
+}
+function validStravaState(state) {
+  const [exp, sig] = String(state || '').split('.');
+  return !!exp && !!sig && Number(exp) > Date.now() && safeEqual(sig, signToken(`strava:${exp}`));
+}
+async function stravaFetch(pathname, options = {}) {
+  const res = await fetch(STRAVA_URL + pathname, { ...options, signal: AbortSignal.timeout(10000) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(`Strava ${res.status} : ${String(data.message || '').slice(0, 120)}`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+function stravaTokenRequest(params) {
+  return stravaFetch('/oauth/token', {
+    method: 'POST',
+    body: new URLSearchParams({ client_id: STRAVA_CLIENT_ID, client_secret: STRAVA_CLIENT_SECRET, ...params })
+  });
+}
+
+// Page affichée à la fin de la connexion : elle peut s'ouvrir hors de l'appli installée
+function stravaResultPage(res, ok, message) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(ok ? 200 : 400).type('html').send(`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>MoggTrack · Strava</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#09090b;color:#f4f4f5;font:16px/1.5 system-ui,sans-serif;text-align:center;padding:24px}
+h1{font-size:1.4rem;margin:0 0 8px}p{color:#a1a1aa;margin:0 0 24px}a{display:inline-block;background:#c8f53b;color:#0b0d02;font-weight:700;text-decoration:none;padding:14px 24px;border-radius:14px}</style>
+</head><body><main><h1>${ok ? 'Strava connecté ✓' : 'Connexion à Strava impossible'}</h1><p>${message}</p>
+<a href="/?strava=${ok ? 'connected' : 'error'}">Retourner dans MoggTrack</a></main></body></html>`);
+}
+
+// Appelé par Strava après l'autorisation : sans mot de passe, le « state » signé sert de preuve
+app.get('/api/strava/callback', async (req, res) => {
+  if (!stravaConfigured()) return stravaResultPage(res, false, 'Strava n\'est pas configuré sur le serveur.');
+  if (!validStravaState(req.query.state)) return stravaResultPage(res, false, 'Lien expiré : relance la connexion depuis les réglages de l\'appli.');
+  if (req.query.error) return stravaResultPage(res, false, 'Autorisation refusée sur Strava.');
+  const scope = String(req.query.scope || '');
+  if (!/activity:read/.test(scope)) {
+    return stravaResultPage(res, false, 'Coche l\'accès à tes activités sur la page Strava, sinon l\'appli ne peut pas les lire.');
+  }
+  try {
+    const token = await stravaTokenRequest({ code: String(req.query.code || ''), grant_type: 'authorization_code' });
+    const athlete = token.athlete || {};
+    await integrationsCol.findOneAndUpdate({ id: 'strava' }, {
+      $set: {
+        id: 'strava',
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token,
+        expiresAt: Number(token.expires_at) || 0,
+        scope,
+        athleteId: athlete.id || null,
+        athleteName: cleanText([athlete.firstname, athlete.lastname].filter(Boolean).join(' '), 100),
+        connectedAt: new Date(),
+        lastSyncAt: null
+      }
+    }, { upsert: true });
+    stravaResultPage(res, true, 'Tes courses vont arriver dans l\'appli.');
+  } catch (e) {
+    reportError('strava', e);
+    stravaResultPage(res, false, 'Strava n\'a pas validé la connexion. Réessaie dans un instant.');
+  }
+});
+
 // Clé d'export (variable EXPORT_KEY, 32 caractères minimum) : permet à une tâche automatique
 // de lire l'export sans se connecter. Elle n'ouvre que GET /api/export, en lecture seule.
 const EXPORT_KEY = (process.env.EXPORT_KEY || '').trim();
@@ -432,10 +523,47 @@ function cleanSessionBlocks(blocks) {
   }));
 }
 
+// --- COURSE À PIED ---
+const RUN_TYPES = ['footing', 'fractionne', 'longue', 'tempo', 'course', 'autre'];
+// Nombre positif borné, 0 sinon ; « 8,5 » est accepté comme 8.5
+function cleanPositive(v, max, decimals = 0) {
+  const n = parseFloat(String(v ?? '').replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const f = 10 ** decimals;
+  return Math.round(Math.min(n, max) * f) / f;
+}
+function cleanRunTarget(t) {
+  return {
+    distanceKm: cleanPositive(t && t.distanceKm, 500, 2),
+    durationSec: cleanPositive(t && t.durationSec, 100 * 3600),
+    details: cleanText(t && t.details, 300)
+  };
+}
+// Objectif (prévu) et réalisé : distance en km, durée en secondes
+function cleanRun(r) {
+  const run = r && typeof r === 'object' ? r : {};
+  const clean = {
+    type: RUN_TYPES.includes(run.type) ? run.type : 'footing',
+    target: cleanRunTarget(run.target),
+    distanceKm: cleanPositive(run.distanceKm, 500, 2),
+    durationSec: cleanPositive(run.durationSec, 100 * 3600),
+    elevation: cleanPositive(run.elevation, 20000),
+    avgHr: cleanPositive(run.avgHr, 250),
+    maxHr: cleanPositive(run.maxHr, 250),
+    feeling: toInt(run.feeling, 0, 5, 0),
+    notes: cleanText(run.notes, 1000)
+  };
+  if (/^\d{1,20}$/.test(String(run.stravaId ?? ''))) clean.stravaId = String(run.stravaId);
+  return clean;
+}
+const cleanKind = kind => (kind === 'run' ? 'run' : 'gym');
+
 function cleanTemplateSessions(list) {
   return list.slice(0, 21).map(s => ({
     name: cleanText(s && s.name, 200),
     dayOfWeek: toInt(s && s.dayOfWeek, 1, 7, 1),
+    kind: cleanKind(s && s.kind),
+    ...(s && s.kind === 'run' ? { run: { type: cleanRun(s.run).type, target: cleanRunTarget(s.run && s.run.target) } } : {}),
     blocks: (Array.isArray(s && s.blocks) ? s.blocks : []).slice(0, 50).map(b => ({
       type: b && b.type === 'superset' ? 'superset' : 'single',
       exercises: (Array.isArray(b && b.exercises) ? b.exercises : []).slice(0, 20).map(ex => ({
@@ -499,6 +627,7 @@ app.post('/api/sessions', route(async (req, res) => {
     return res.status(400).json({ error: 'Indique une date valide (AAAA-MM-JJ) et un nom de séance' });
   }
   const session = { id: crypto.randomUUID(), date, name, blocks: cleanSessionBlocks(body.blocks) };
+  if (body.kind === 'run') Object.assign(session, { kind: 'run', run: cleanRun(body.run) });
   await sessionsCol.insertOne({ ...session });
   res.status(201).json(session);
 }));
@@ -520,6 +649,8 @@ app.put('/api/sessions/:id', route(async (req, res) => {
     update.name = name;
   }
   if (body.blocks !== undefined) update.blocks = cleanSessionBlocks(body.blocks);
+  if (body.kind !== undefined) update.kind = cleanKind(body.kind);
+  if (body.run !== undefined) update.run = cleanRun(body.run);
   if (typeof body.completed === 'boolean') update.completed = body.completed;
   // Une séance dupliquée garde la semaine type dont elle vient
   if (typeof body.templateName === 'string') update.templateName = cleanText(body.templateName, 200);
@@ -604,7 +735,9 @@ app.post('/api/templates/:id/apply', route(async (req, res) => {
       // Mémorise la semaine type d'origine pour l'afficher dans le calendrier
       templateName: tpl.name,
       weekType: tpl.weekType || '',
-      blocks: (tplSession.blocks || []).map(b => ({
+      // Course prévue : l'objectif est repris, le réalisé arrivera de Strava ou de la saisie
+      ...(tplSession.kind === 'run' ? { kind: 'run', run: cleanRun({ type: tplSession.run && tplSession.run.type, target: tplSession.run && tplSession.run.target }) } : {}),
+      blocks: tplSession.kind === 'run' ? [] : (tplSession.blocks || []).map(b => ({
         type: b.type,
         exercises: (b.exercises || []).map(ex => ({
           name: ex.name,
@@ -744,6 +877,15 @@ function csvCell(value) {
 function sessionsToCsv(sessions) {
   const rows = [['Date', 'Séance', 'Terminée', 'Bloc', 'Exercice', 'Repos (s)', 'Série', 'Objectif', 'Reps', 'Poids (kg)', 'Validée', 'Note']];
   [...sessions].sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(s => {
+    if (s.kind === 'run' && s.run) {
+      const r = s.run;
+      const summary = [r.distanceKm && `${r.distanceKm} km`, r.durationSec && `${Math.round(r.durationSec / 60)} min`,
+        r.elevation && `D+ ${r.elevation} m`, r.avgHr && `FC moy ${r.avgHr}`, r.maxHr && `FC max ${r.maxHr}`].filter(Boolean).join(' · ');
+      const target = [r.target && r.target.distanceKm && `${r.target.distanceKm} km`, r.target && r.target.details].filter(Boolean).join(' · ');
+      rows.push([s.date, s.name, s.completed ? 'oui' : 'non', 'course', r.type, '', '', target, '', '', s.completed ? 'oui' : 'non',
+        [summary, r.notes].filter(Boolean).join(' · ')]);
+      return;
+    }
     (s.blocks || []).forEach(b => (b.exercises || []).forEach(ex => (ex.sets || []).forEach((set, i) => {
       rows.push([
         s.date, s.name, s.completed ? 'oui' : 'non', b.type === 'superset' ? 'superset' : 'simple',
@@ -766,6 +908,160 @@ app.get('/api/export', route(async (req, res) => {
   const templates = await templatesCol.find({}, NO_ID).toArray();
   res.setHeader('Content-Disposition', `attachment; filename="moggtrack-${stamp}.json"`);
   res.json({ exportedAt: new Date().toISOString(), sessions, templates });
+}));
+
+// --- STRAVA (routes connectées) ---
+const NO_STRAVA = { error: 'Strava n\'est pas configuré sur le serveur', code: 'STRAVA_NOT_CONFIGURED' };
+
+// Jeton d'accès valide (renouvelé si besoin), ou null si Strava a été déconnecté
+async function stravaAccessToken(link) {
+  if (link.expiresAt - 60 > Date.now() / 1000) return link.accessToken;
+  try {
+    const token = await stravaTokenRequest({ grant_type: 'refresh_token', refresh_token: link.refreshToken });
+    await integrationsCol.updateOne({ id: 'strava' }, {
+      $set: { accessToken: token.access_token, refreshToken: token.refresh_token, expiresAt: Number(token.expires_at) || 0 }
+    });
+    return token.access_token;
+  } catch (e) {
+    // Accès retiré depuis Strava : il faudra reconnecter
+    if (e.status === 400 || e.status === 401) {
+      await integrationsCol.deleteOne({ id: 'strava' });
+      return null;
+    }
+    throw e;
+  }
+}
+
+// Type de course d'après Strava (compétition, sortie longue, entraînement), sinon celui prévu
+function stravaRunType(activity, planned) {
+  const byWorkout = { 1: 'course', 2: 'longue', 3: 'fractionne' }[activity.workout_type];
+  return byWorkout || (planned && planned.run && planned.run.type) || 'footing';
+}
+function stravaRunFields(a) {
+  return {
+    distanceKm: (Number(a.distance) || 0) / 1000,
+    durationSec: Number(a.moving_time) || Number(a.elapsed_time) || 0,
+    elevation: Number(a.total_elevation_gain) || 0,
+    avgHr: Number(a.average_heartrate) || 0,
+    maxHr: Number(a.max_heartrate) || 0,
+    stravaId: String(a.id)
+  };
+}
+
+// Importe les courses Strava : une course prévue le même jour est complétée, sinon une séance est créée
+async function syncStrava(link) {
+  const token = await stravaAccessToken(link);
+  if (!token) return { connected: false };
+  const nowS = Math.floor(Date.now() / 1000);
+  const lastS = link.lastSyncAt ? Math.floor(new Date(link.lastSyncAt).getTime() / 1000) : 0;
+  const after = lastS ? lastS - STRAVA_OVERLAP_S : nowS - STRAVA_FIRST_SYNC_DAYS * 86400;
+  const startedAt = new Date();
+
+  const activities = [];
+  for (let page = 1; page <= 3; page++) {
+    const batch = await stravaFetch(`/api/v3/athlete/activities?after=${after}&per_page=100&page=${page}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!Array.isArray(batch)) break;
+    activities.push(...batch);
+    if (batch.length < 100) break;
+  }
+  const runs = activities
+    .filter(a => STRAVA_RUN_SPORTS.includes(a.sport_type || a.type) && a.start_date_local)
+    .sort((a, b) => String(a.start_date_local).localeCompare(String(b.start_date_local)));
+
+  const known = await sessionsCol.find({ kind: 'run' }, NO_ID).toArray();
+  const imported = new Set(known.map(s => s.run && s.run.stravaId).filter(Boolean));
+  let created = 0, completed = 0;
+  for (const a of runs) {
+    if (imported.has(String(a.id))) continue;
+    imported.add(String(a.id));
+    const date = String(a.start_date_local).slice(0, 10);
+    if (!DATE_RE.test(date)) continue;
+    const planned = known.find(s => s.date === date && !s.completed && !(s.run && s.run.stravaId));
+    try {
+      if (planned) {
+        planned.completed = true;
+        // Objectif, ressenti et notes déjà saisis sont gardés
+        const run = cleanRun({ ...planned.run, ...stravaRunFields(a), type: stravaRunType(a, planned) });
+        await sessionsCol.updateOne({ id: planned.id }, { $set: { run, completed: true } });
+        completed++;
+      } else {
+        await sessionsCol.insertOne({
+          id: crypto.randomUUID(),
+          date,
+          name: cleanText(a.name, 200) || 'Course',
+          kind: 'run',
+          run: cleanRun({ ...stravaRunFields(a), type: stravaRunType(a) }),
+          blocks: [],
+          completed: true
+        });
+        created++;
+      }
+    } catch (e) {
+      if (e.code !== 11000) throw e; // déjà importée par une synchronisation simultanée
+    }
+  }
+  // Notée seulement si tout s'est bien passé : un échec ne fait rien perdre
+  await integrationsCol.updateOne({ id: 'strava' }, { $set: { lastSyncAt: startedAt } });
+  return { connected: true, created, completed };
+}
+
+app.get('/api/strava', route(async (req, res) => {
+  const link = await integrationsCol.findOne({ id: 'strava' });
+  res.json({
+    configured: stravaConfigured(),
+    connected: !!link,
+    athleteName: link ? link.athleteName : '',
+    lastSyncAt: link ? link.lastSyncAt : null
+  });
+}));
+
+app.get('/api/strava/connect-url', (req, res) => {
+  if (!stravaConfigured()) return res.status(503).json(NO_STRAVA);
+  const params = new URLSearchParams({
+    client_id: STRAVA_CLIENT_ID,
+    redirect_uri: `${publicOrigin(req)}/api/strava/callback`,
+    response_type: 'code',
+    approval_prompt: 'auto',
+    scope: STRAVA_SCOPE,
+    state: stravaState()
+  });
+  res.json({ url: `${STRAVA_URL}/oauth/authorize?${params}` });
+});
+
+let stravaSyncRunning = null;
+app.post('/api/strava/sync', route(async (req, res) => {
+  if (!stravaConfigured()) return res.json({ connected: false, configured: false });
+  const link = await integrationsCol.findOne({ id: 'strava' });
+  if (!link) return res.json({ connected: false, configured: true });
+  const force = !!(req.body && req.body.force);
+  if (!force && link.lastSyncAt && Date.now() - new Date(link.lastSyncAt).getTime() < STRAVA_SYNC_MIN_MS) {
+    return res.json({ connected: true, skipped: true, created: 0, completed: 0 });
+  }
+  // Deux appareils qui s'ouvrent en même temps ne lancent qu'une synchronisation
+  if (!stravaSyncRunning) stravaSyncRunning = syncStrava(link).finally(() => { stravaSyncRunning = null; });
+  try {
+    res.json(await stravaSyncRunning);
+  } catch (e) {
+    reportError('strava', e);
+    res.status(502).json({ error: 'Strava ne répond pas pour le moment, réessaie plus tard' });
+  }
+}));
+
+app.delete('/api/strava', route(async (req, res) => {
+  const link = await integrationsCol.findOne({ id: 'strava' });
+  if (link) {
+    // Retire aussi l'accès côté Strava ; les courses déjà importées restent dans l'appli
+    try {
+      const token = await stravaAccessToken(link);
+      if (token) await stravaFetch('/oauth/deauthorize', { method: 'POST', body: new URLSearchParams({ access_token: token }) });
+    } catch (e) {
+      console.warn('Strava : retrait de l\'accès impossible', e.message);
+    }
+    await integrationsCol.deleteOne({ id: 'strava' });
+  }
+  res.json({ message: 'Strava déconnecté' });
 }));
 
 app.use('/api', (req, res) => {

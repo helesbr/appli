@@ -101,6 +101,7 @@ document.getElementById('settingsBtn').onclick = () => {
     ? `${count} modification${count > 1 ? 's' : ''} en attente d'envoi`
     : 'Toutes tes modifications sont envoyées';
   openModal('settingsModal');
+  loadStravaSettings();
   loadDevices();
   loadHealth();
 };

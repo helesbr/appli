@@ -29,6 +29,7 @@ function startApp() {
   quiet(loadTemplates());
   loadPushKey().catch(() => {});
   flushOutbox();
+  autoSyncStrava();
 }
 function showLogin(message) {
   rememberDevice();
@@ -81,6 +82,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden || !getToken() || Date.now() - lastRefreshAt < REFRESH_MIN_MS) return;
   flushOutbox();
   quiet(loadSessions());
+  // Retour dans l'appli après une sortie : la course arrive de Strava
+  autoSyncStrava();
 });
 
 async function loadSessions() {

@@ -10,7 +10,7 @@ function templateCardHTML(tpl, withCopy) {
   const days = new Set(tpl.sessions.map(s=>s.dayOfWeek));
   const strip = DAYS_LETTER.map((l,i)=>`<span class="${days.has(i+1)?'on':''}">${l}</span>`).join('');
   const sessionsInfo = [...tpl.sessions].sort((a,b)=>a.dayOfWeek-b.dayOfWeek)
-    .map(s=>`<span class="tpl-day-label"><b>${DAYS_SHORT[s.dayOfWeek-1]}</b>${escapeHtml(s.name)}</span>`).join('');
+    .map(s=>`<span class="tpl-day-label${s.kind==='run'?' run':''}"><b>${DAYS_SHORT[s.dayOfWeek-1]}</b>${s.kind==='run'?icon('run','ic-sm'):''}${escapeHtml(s.name)}</span>`).join('');
   return `
     <div class="tpl-card-header">
       <span class="tpl-card-name">${escapeHtml(tpl.name)}</span>
@@ -84,12 +84,40 @@ function addTplSessionUI(s) {
       <button class="icon-btn lg copy-tpl-session" aria-label="Dupliquer la séance">${icon('copy','ic-sm')}</button>
       <button class="icon-btn lg danger remove-tpl-session" aria-label="Supprimer la séance">${icon('trash','ic-sm')}</button>
     </div>
-    <div class="tpl-blocks"></div>
-    <div class="inline-actions" style="margin-top:4px;">
-      <button class="btn btn-ghost btn-sm add-tpl-single" style="flex:1;">${icon('plus','ic-sm')}Exercice</button>
-      <button class="btn btn-violet btn-sm add-tpl-superset" style="flex:1;">${icon('zap','ic-sm')}Superset</button>
+    <div class="kind-switch small tpl-kind" role="group" aria-label="Type de séance">
+      <button data-kind="gym">${icon('dumbbell')}Muscu</button>
+      <button data-kind="run">${icon('run')}Course</button>
+    </div>
+    <div class="tpl-gym">
+      <div class="tpl-blocks"></div>
+      <div class="inline-actions" style="margin-top:4px;">
+        <button class="btn btn-ghost btn-sm add-tpl-single" style="flex:1;">${icon('plus','ic-sm')}Exercice</button>
+        <button class="btn btn-violet btn-sm add-tpl-superset" style="flex:1;">${icon('zap','ic-sm')}Superset</button>
+      </div>
+    </div>
+    <div class="tpl-run-fields">
+      <select class="tpl-run-type" aria-label="Type de course">${Object.entries(RUN_TYPES).map(([v, l]) => `<option value="${v}" ${s&&s.run&&s.run.type===v?'selected':''}>${l}</option>`).join('')}</select>
+      <label class="unit-input" title="Distance visée"><input type="text" class="tpl-run-distance" inputmode="decimal" placeholder="8" value="${s&&s.run&&s.run.target&&num(s.run.target.distanceKm)>0?escapeHtml(String(s.run.target.distanceKm).replace('.', ',')):''}"><span>km</span></label>
+      <label class="unit-input" title="Durée visée (45, 45:30, 1:05:00)">${icon('timer')}<input type="text" class="tpl-run-duration" inputmode="numeric" placeholder="45:00" value="${s&&s.run&&s.run.target?escapeHtml(formatDuration(s.run.target.durationSec)):''}"></label>
+      <input type="text" class="tpl-run-details" maxlength="300" autocomplete="off" placeholder="Détails : 6 × 400 m, récup 1'30…" aria-label="Détails de la course" value="${s&&s.run&&s.run.target&&s.run.target.details?escapeHtml(s.run.target.details):''}">
     </div>
   `;
+  // Muscu ou course : seuls les champs utiles sont affichés
+  const setKind = kind => {
+    div.dataset.kind = kind;
+    div.querySelectorAll('.tpl-kind button').forEach(b => {
+      b.classList.toggle('active', b.dataset.kind === kind);
+      b.setAttribute('aria-pressed', b.dataset.kind === kind);
+    });
+    div.querySelector('.tpl-gym').hidden = kind === 'run';
+    div.querySelector('.tpl-run-fields').hidden = kind !== 'run';
+    div.querySelector('.tpl-session-name').placeholder = kind === 'run' ? 'Footing, Fractionné…' : 'Push, Pull…';
+  };
+  div.querySelector('.tpl-kind').onclick = e => {
+    const btn = e.target.closest('[data-kind]');
+    if (btn) setKind(btn.dataset.kind);
+  };
+  setKind(s && s.kind === 'run' ? 'run' : 'gym');
   div.querySelector('.remove-tpl-session').onclick = () => div.remove();
   // La copie arrive juste en dessous, sur le jour suivant
   div.querySelector('.copy-tpl-session').onclick = () => {
@@ -160,11 +188,28 @@ function readTplSession(sDiv) {
     });
     if (exercises.length>0) blocks.push({type, exercises});
   });
-  return {
-    name: sDiv.querySelector('.tpl-session-name').value.trim(),
-    dayOfWeek: parseInt(sDiv.querySelector('.tpl-day').value),
-    blocks
-  };
+  const name = sDiv.querySelector('.tpl-session-name').value.trim();
+  const dayOfWeek = parseInt(sDiv.querySelector('.tpl-day').value);
+  if (sDiv.dataset.kind === 'run') {
+    const type = sDiv.querySelector('.tpl-run-type').value;
+    const duration = parseDuration(sDiv.querySelector('.tpl-run-duration').value);
+    return {
+      // Sans nom, la course prend celui de son type : elle n'est pas perdue à l'enregistrement
+      name: name || RUN_TYPES[type],
+      dayOfWeek,
+      kind: 'run',
+      run: {
+        type,
+        target: {
+          distanceKm: num(sDiv.querySelector('.tpl-run-distance').value.replace(',', '.')),
+          durationSec: Number.isNaN(duration) ? 0 : duration,
+          details: sDiv.querySelector('.tpl-run-details').value.trim()
+        }
+      },
+      blocks: []
+    };
+  }
+  return { name, dayOfWeek, kind: 'gym', blocks };
 }
 
 document.getElementById('saveTplBtn').onclick = () => {
