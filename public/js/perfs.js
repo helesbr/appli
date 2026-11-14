@@ -1,5 +1,6 @@
 // Records et détail d'une séance
 async function loadPerfs() {
+  if (perfKind === 'run') renderRunPerfs();
   const data = await api('/api/top-perfs');
   perfs = Array.isArray(data) ? data : [];
   renderPerfs();
@@ -72,3 +73,53 @@ async function showSessionDetail(id) {
 }
 document.getElementById('closeDetailBtn').onclick = () => closeModal('detailModal');
 document.getElementById('perfEmptyBtn').onclick = () => showPage('calendar');
+
+// --- RECORDS DE COURSE ---
+// Calculés sur les séances déjà chargées : disponibles aussi hors connexion
+let perfKind = 'gym';
+
+function runRecordHTML(iconName, label, session, value, detail = session.name, note = '') {
+  return `<div class="run-record card" role="button" tabindex="0" data-run="${escapeHtml(session.id)}">
+    <div class="perf-avatar">${icon(iconName)}</div>
+    <div class="perf-info">
+      <div class="perf-exo">${label}</div>
+      <div class="perf-detail">${frDate(session.date)} · ${escapeHtml(detail)}${note ? ` · ${note}` : ''}</div>
+    </div>
+    <div class="perf-value"><div class="perf-weight">${value}</div></div>
+  </div>`;
+}
+
+function renderRunPerfs() {
+  const r = runRecords(sessions, formatDate(new Date()));
+  document.getElementById('runWeekKm').innerHTML = `${formatKm(r.weekKm)}<small>km</small>`;
+  document.getElementById('runMonthKm').innerHTML = `${formatKm(r.monthKm)}<small>km</small>`;
+  document.getElementById('runYearKm').innerHTML = `${formatKm(r.yearKm)}<small>km</small>`;
+  const records = [];
+  if (r.longest) records.push(runRecordHTML('run', 'Plus longue sortie', r.longest, `${formatKm(r.longest.run.distanceKm)}<small>km</small>`));
+  if (r.fastest) records.push(runRecordHTML('gauge', 'Meilleure allure', r.fastest, `${formatPace(paceSeconds(r.fastest.run.distanceKm, r.fastest.run.durationSec))}<small>/km</small>`, r.fastest.name, 'sur 3 km et +'));
+  if (r.climb) records.push(runRecordHTML('mountain', 'Plus gros dénivelé', r.climb, `${Math.round(r.climb.run.elevation)}<small>m</small>`));
+  document.getElementById('runRecordList').innerHTML = records.join('');
+  document.getElementById('runRecentList').innerHTML = r.recent
+    .map(s => runRecordHTML('run', escapeHtml(s.name), s, `${formatKm(s.run.distanceKm)}<small>km</small>`, runSummary(s.run))).join('');
+  document.getElementById('runRecentTitle').hidden = r.recent.length === 0;
+  document.getElementById('runEmpty').hidden = r.recent.length > 0;
+}
+
+function setPerfKind(kind) {
+  perfKind = kind;
+  document.querySelectorAll('#perfKindSwitch button').forEach(b => {
+    b.classList.toggle('active', b.dataset.kind === kind);
+    b.setAttribute('aria-pressed', b.dataset.kind === kind);
+  });
+  document.getElementById('perfGym').hidden = kind === 'run';
+  document.getElementById('perfRun').hidden = kind !== 'run';
+  if (kind === 'run') renderRunPerfs();
+}
+document.getElementById('perfKindSwitch').onclick = e => {
+  const btn = e.target.closest('[data-kind]');
+  if (btn) setPerfKind(btn.dataset.kind);
+};
+document.getElementById('perfRun').onclick = e => {
+  const card = e.target.closest('[data-run]');
+  if (card) openEditRun(card.dataset.run);
+};

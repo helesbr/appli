@@ -173,3 +173,60 @@ test('les modifications en attente s\'appliquent sur les données du serveur', (
   ]);
   assert.strictEqual(server.length, 2);
 });
+
+test('durée de course : minutes seules, mm:ss, h:mm:ss et « 1h05 »', () => {
+  assert.strictEqual(logic.parseDuration('45'), 2700);
+  assert.strictEqual(logic.parseDuration('45:30'), 2730);
+  assert.strictEqual(logic.parseDuration(' 1:02:10 '), 3730);
+  assert.strictEqual(logic.parseDuration('1h05'), 3900);
+  assert.strictEqual(logic.parseDuration('1h'), 3600);
+  assert.strictEqual(logic.parseDuration('50min'), 3000);
+  assert.strictEqual(logic.parseDuration(''), 0);
+  assert.ok(Number.isNaN(logic.parseDuration('45:75')));
+  assert.ok(Number.isNaN(logic.parseDuration('abc')));
+  assert.strictEqual(logic.formatDuration(2580), '43:00');
+  assert.strictEqual(logic.formatDuration(3730), '1:02:10');
+  assert.strictEqual(logic.formatDuration(0), '');
+});
+
+test('allure au km et résumé d\'une course : réalisé, sinon objectif', () => {
+  assert.strictEqual(logic.formatPace(logic.paceSeconds(8.23, 2580)), '5:13');
+  assert.strictEqual(logic.paceSeconds(0, 2580), 0);
+  assert.strictEqual(logic.formatPace(0), '');
+  assert.strictEqual(logic.runSummary({ distanceKm: 8.23, durationSec: 2580 }), '8,23 km · 43:00 · 5:13 /km');
+  assert.strictEqual(logic.runSummary({ type: 'longue', target: { distanceKm: 12, durationSec: 4200 } }), 'Objectif 12 km · 1:10:00');
+  assert.strictEqual(logic.runSummary({ type: 'fractionne', target: { details: '6×400 m' } }), '6×400 m');
+  assert.strictEqual(logic.runSummary({ type: 'tempo' }), 'Tempo');
+});
+
+test('records de course : plus longue, meilleure allure sur 3 km et plus, totaux', () => {
+  const run = (date, distanceKm, durationSec, elevation = 0) => ({ id: date + distanceKm, date, kind: 'run', run: { distanceKm, durationSec, elevation } });
+  const sessions = [
+    run('2026-11-09', 10, 3000, 80),   // lundi, 5:00 /km
+    run('2026-11-12', 2, 480),         // 4:00 /km mais trop court pour le record
+    run('2026-11-14', 21.1, 7000, 120),
+    run('2026-10-30', 8, 2560),        // mois précédent, 5:20 /km
+    { id: 'prevue', date: '2026-11-15', kind: 'run', run: { distanceKm: 0, target: { distanceKm: 6 } } },
+    { id: 'muscu', date: '2026-11-13', blocks: [] }
+  ];
+  const r = logic.runRecords(sessions, '2026-11-14');
+  assert.strictEqual(r.longest.date, '2026-11-14');
+  assert.strictEqual(r.fastest.date, '2026-11-09');
+  assert.strictEqual(r.climb.run.elevation, 120);
+  assert.strictEqual(r.weekKm, 33.1);
+  assert.strictEqual(r.monthKm, 33.1);
+  assert.strictEqual(r.yearKm, 41.1);
+  assert.deepStrictEqual(r.recent.map(s => s.date), ['2026-11-14', '2026-11-12', '2026-11-09', '2026-10-30']);
+  assert.strictEqual(logic.runRecords([], '2026-11-14').longest, null);
+});
+
+test('dupliquer une course : le réalisé devient l\'objectif, les résultats repartent à zéro', () => {
+  const copy = logic.duplicateSession({
+    id: 'a', date: '2026-11-10', name: 'Footing', kind: 'run', completed: true, weekType: 'Endurance',
+    run: { type: 'footing', distanceKm: 8.2, durationSec: 2580, avgHr: 150, feeling: 4, stravaId: '99', target: { details: 'Facile' } }
+  }, '2026-11-17');
+  assert.deepStrictEqual(copy, {
+    date: '2026-11-17', name: 'Footing', completed: false, kind: 'run', blocks: [], weekType: 'Endurance',
+    run: { type: 'footing', target: { distanceKm: 8.2, durationSec: 2580, details: 'Facile' } }
+  });
+});

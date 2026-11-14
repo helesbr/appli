@@ -29,16 +29,24 @@ function renderWeek() {
         weekTypes[k] = (weekTypes[k] || 0) + 1;
       }
       if (s.completed) doneSessions++;
-      const statusLabel = { done: 'Terminée · ', missed: 'Manquée · ', planned: '' }[status];
-      return `<div class="session-dot ${status}${s.completed?' completed':''}" data-id="${escapeHtml(s.id)}" role="button" tabindex="0" aria-label="Modifier ${escapeHtml(s.name)}">
+      const run = isRun(s);
+      const statusLabel = run
+        ? { done: '', missed: 'Manquée · ', planned: '' }[status]
+        : { done: 'Terminée · ', missed: 'Manquée · ', planned: '' }[status];
+      const meta = run ? runSummary(s.run) : `${st.exos} exo${st.exos>1?'s':''} · ${st.sets} séries`;
+      // Une course prévue se remplit dans son formulaire (ou arrive de Strava) : pas de bouton « lancer »
+      const action = s.completed
+        ? `<span class="s-done" title="${run ? 'Course faite' : 'Séance terminée'}">${icon('check','ic-sm')}</span>`
+        : run
+          ? `<span class="s-run" title="Course prévue">${icon('run','ic-sm')}</span>`
+          : `<button class="chip-play" data-play="${escapeHtml(s.id)}" aria-label="Lancer la séance">${icon('play','ic-sm')}</button>`;
+      return `<div class="session-dot ${status}${s.completed?' completed':''}${run?' run':''}" data-id="${escapeHtml(s.id)}" role="button" tabindex="0" aria-label="Modifier ${escapeHtml(s.name)}">
         <div class="s-info">
           <span class="s-name">${escapeHtml(s.name)}</span>
-          <span class="s-meta">${statusLabel}${st.exos} exo${st.exos>1?'s':''} · ${st.sets} séries</span>
+          <span class="s-meta">${statusLabel}${escapeHtml(meta)}</span>
         </div>
         <button class="chip-copy" data-copy="${escapeHtml(s.id)}" aria-label="Dupliquer ${escapeHtml(s.name)}">${icon('copy','ic-sm')}</button>
-        ${s.completed
-          ? `<span class="s-done" title="Séance terminée">${icon('check','ic-sm')}</span>`
-          : `<button class="chip-play" data-play="${escapeHtml(s.id)}" aria-label="Lancer la séance">${icon('play','ic-sm')}</button>`}
+        ${action}
       </div>`;
     }).join('');
     cell.innerHTML = `
@@ -84,7 +92,15 @@ function renderHero() {
   const today = formatDate(new Date());
   const todays = sessions.filter(s => s.date === today);
   const pending = todays.find(s => !s.completed);
-  if (pending) {
+  if (pending && isRun(pending)) {
+    const summary = runSummary(pending.run);
+    const details = ((pending.run || {}).target || {}).details;
+    el.className = 'hero hero-go hero-run';
+    el.innerHTML = `<div class="hero-kicker">Aujourd'hui · Course</div>
+      <div class="hero-title">${escapeHtml(pending.name)}</div>
+      <div class="hero-meta">${escapeHtml(details && details !== summary ? `${summary} · ${details}` : summary)}</div>
+      <button class="hero-btn" data-run="${escapeHtml(pending.id)}">${icon('run')}Saisir ma course</button>`;
+  } else if (pending) {
     const st = sessionStats(pending);
     el.className = 'hero hero-go';
     el.innerHTML = `<div class="hero-kicker">Aujourd'hui</div>
@@ -92,11 +108,17 @@ function renderHero() {
       <div class="hero-meta">${st.exos} exercice${st.exos > 1 ? 's' : ''} · ${st.sets} séries</div>
       <button class="hero-btn" data-play="${escapeHtml(pending.id)}">${icon('play')}Lancer la séance</button>`;
   } else if (todays.length) {
-    const st = todays.reduce((a, s) => { const x = sessionStats(s); return { sets: a.sets + x.sets, volume: a.volume + x.volume }; }, { sets: 0, volume: 0 });
+    const gym = todays.filter(s => !isRun(s));
+    const st = gym.reduce((a, s) => { const x = sessionStats(s); return { sets: a.sets + x.sets, volume: a.volume + x.volume }; }, { sets: 0, volume: 0 });
+    const km = todays.filter(isRun).reduce((total, s) => total + num(s.run && s.run.distanceKm), 0);
+    const meta = [
+      gym.length && `${st.sets} séries · ${formatVolume(st.volume).replace(/<\/?small>/g, ' ').trim()} soulevés`,
+      km > 0 && `${formatKm(km)} km courus`
+    ].filter(Boolean).join(' · ');
     el.className = 'hero hero-done';
     el.innerHTML = `<div class="hero-kicker">Séance du jour terminée</div>
       <div class="hero-title">${todays.map(s => escapeHtml(s.name)).join(' + ')} 💪</div>
-      <div class="hero-meta">${st.sets} séries · ${formatVolume(st.volume).replace(/<\/?small>/g, ' ').trim()} soulevés</div>`;
+      <div class="hero-meta">${meta}</div>`;
   } else {
     const next = sessions.filter(s => s.date > today && !s.completed).sort((a, b) => a.date.localeCompare(b.date))[0];
     el.className = 'hero hero-rest';
@@ -112,6 +134,8 @@ function renderHero() {
 document.getElementById('heroCard').onclick = e => {
   const play = e.target.closest('[data-play]');
   if (play) return openWorkout(play.dataset.play);
+  const run = e.target.closest('[data-run]');
+  if (run) return openEditRun(run.dataset.run);
   const action = e.target.closest('[data-hero]');
   if (!action) return;
   if (action.dataset.hero === 'new') openNewSession();

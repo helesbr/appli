@@ -35,6 +35,11 @@
       --violet-line: rgba(167,139,250,0.35);
       --danger: #fb7185;
       --danger-soft: rgba(251,113,133,0.12);
+      /* Course à pied : bleu ciel, pour la distinguer de la muscu d'un coup d'œil */
+      --run: #7dd3fc;
+      --run-soft: rgba(125,211,252,0.10);
+      --run-line: rgba(125,211,252,0.35);
+      --strava: #fc4c02;
       --radius: 18px;
       --radius-sm: 12px;
       --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -801,6 +806,51 @@
     .settings-note { color: var(--muted); font-size: 0.82rem; }
     .settings-note.error { color: var(--danger); }
     .settings-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* --- COURSE À PIED --- */
+    .kind-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; }
+    .kind-switch button { display: flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 10px; font-weight: 600; font-size: 0.9rem; color: var(--muted); transition: background .2s, color .2s; }
+    .kind-switch button .ic { width: 16px; height: 16px; }
+    .kind-switch button.active { background: var(--accent-grad); color: var(--accent-ink); }
+    .kind-switch button.active[data-kind="run"] { background: var(--run); color: #04131b; }
+    .kind-switch.small { margin: 0 0 10px; }
+    .kind-switch.small button { height: 34px; font-size: 0.82rem; }
+    .form-grid.three { grid-template-columns: repeat(3, 1fr); }
+    .form-row .unit { color: var(--subtle); font-weight: 500; }
+    .run-pace { color: var(--run); font-family: var(--font-display); font-size: 0.95rem; letter-spacing: 0; text-transform: none; }
+    .feeling { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .feeling button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); font-size: 1.3rem; line-height: 1; }
+    .feeling button span { font-size: 0.66rem; color: var(--muted); font-weight: 600; }
+    .feeling button.active { background: var(--run-soft); border-color: var(--run); }
+    .feeling button.active span { color: var(--run); }
+    .strava-badge { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px 12px; border-radius: var(--radius-sm); background: rgba(252,76,2,0.10); border: 1px solid rgba(252,76,2,0.35); color: #ffb08a; font-size: 0.82rem; font-weight: 600; }
+    .strava-badge .ic { width: 16px; height: 16px; color: var(--strava); }
+    .btn-strava { background: var(--strava); color: #fff; }
+    .btn-strava:hover { filter: brightness(1.08); }
+    .session-dot.run .s-name::before { background: var(--run); box-shadow: 0 0 10px rgba(125,211,252,0.6); }
+    .session-dot.run:hover { border-color: var(--run-line); background: var(--run-soft); }
+    .session-dot.run.completed .s-name::before { background: var(--subtle); box-shadow: none; }
+    .session-dot.run.missed .s-name::before { background: var(--danger); box-shadow: none; }
+    .s-run { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--run-soft); color: var(--run); border: 1px solid var(--run-line); }
+    .s-run .ic { width: 18px; height: 18px; }
+    .hero-go.hero-run { background: radial-gradient(130% 150% at 100% 0%, #d9f4ff 0%, #8fdcff 40%, #4cb6e6 100%); color: #04131b; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 24px 50px -22px rgba(125,211,252,0.7); }
+    .hero-run .hero-btn { color: var(--run); }
+    .tpl-day-label.run b { color: var(--run); }
+    .tpl-run-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+    .tpl-run-fields > *, .tpl-run-fields .unit-input input { min-width: 0; }
+    .tpl-run-fields .tpl-run-details { grid-column: 1 / -1; }
+    .tpl-run-fields .unit-input { width: 100%; height: 46px; }
+    .modal .tpl-run-fields .unit-input input[type=text] { flex: 1; width: auto; text-align: left; }
+    .run-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .run-totals .stat { padding: 12px; }
+    .run-totals .stat-value { font-size: 1.35rem; }
+    .run-record { display: flex; align-items: center; gap: 14px; padding: 14px; margin-bottom: 8px; cursor: pointer; }
+    .run-record .perf-avatar { background: var(--run-soft); border-color: var(--run-line); color: var(--run); }
+    .run-record .perf-avatar .ic { width: 22px; height: 22px; }
+    .run-record .perf-weight { color: var(--run); }
+    .run-list-title { margin-top: 20px; }
+    .strava-credit { margin-top: 14px; text-align: center; color: var(--subtle); font-size: 0.72rem; }
+    .strava-credit b { color: var(--strava); }
     .tag-current { color: var(--accent); font-size: 0.72rem; font-weight: 600; margin-left: 4px; white-space: nowrap; }
     .empty-action { margin-top: 14px; }
 
@@ -856,6 +906,10 @@
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
     <symbol id="i-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+    <symbol id="i-run" viewBox="0 0 24 24"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></symbol>
+    <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/></symbol>
+    <symbol id="i-mountain" viewBox="0 0 24 24"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
     <symbol id="i-logo" viewBox="0 0 24 24"><path d="M5 17V7l7 5 7-5v10"/></symbol>
   </svg>
 
@@ -945,6 +999,22 @@
       <p class="eyebrow">Records</p>
       <h1>Meilleures perfs</h1>
     </div>
+    <div class="kind-switch" id="perfKindSwitch" role="group" aria-label="Records à afficher">
+      <button class="active" data-kind="gym" aria-pressed="true"><svg class="ic"><use href="#i-dumbbell"/></svg>Muscu</button>
+      <button data-kind="run" aria-pressed="false"><svg class="ic"><use href="#i-run"/></svg>Course</button>
+    </div>
+    <div id="perfRun" hidden>
+      <div class="run-totals">
+        <div class="stat card"><div class="stat-label">Semaine</div><div class="stat-value" id="runWeekKm">0</div></div>
+        <div class="stat card"><div class="stat-label">Mois</div><div class="stat-value" id="runMonthKm">0</div></div>
+        <div class="stat card"><div class="stat-label">Année</div><div class="stat-value" id="runYearKm">0</div></div>
+      </div>
+      <div id="runRecordList"></div>
+      <div class="section-title run-list-title" id="runRecentTitle">Dernières courses</div>
+      <div id="runRecentList"></div>
+      <div class="empty" id="runEmpty">Tes records de course apparaîtront ici.<br>Saisis une course ou connecte Strava dans les réglages.</div>
+    </div>
+    <div id="perfGym">
     <label class="search">
       <svg class="ic"><use href="#i-search"/></svg>
       <input type="text" id="perfSearch" placeholder="Rechercher un exercice…" aria-label="Rechercher un exercice" autocomplete="off">
@@ -953,6 +1023,7 @@
     <p class="no-result" id="perfNoResult" hidden></p>
     <div class="empty" id="perfEmpty">Tes records apparaîtront ici<br>dès ta première série avec une charge.
       <div class="empty-action"><button class="btn btn-primary btn-sm" id="perfEmptyBtn"><svg class="ic ic-sm"><use href="#i-calendar"/></svg>Voir mes séances</button></div>
+    </div>
     </div>
   </main>
 
@@ -1012,6 +1083,10 @@
         <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
       <div class="modal-body">
+        <div class="kind-switch" id="sessionKindSwitch" role="group" aria-label="Type de séance">
+          <button class="active" data-kind="gym" aria-pressed="true"><svg class="ic"><use href="#i-dumbbell"/></svg>Muscu</button>
+          <button data-kind="run" aria-pressed="false"><svg class="ic"><use href="#i-run"/></svg>Course</button>
+        </div>
         <button class="btn btn-primary btn-block start-wk" id="startWorkoutBtn"><svg class="ic"><use href="#i-play"/></svg>Lancer la séance</button>
         <div class="form-grid">
           <div class="form-row">
@@ -1035,6 +1110,88 @@
         <button class="icon-btn lg" id="duplicateSessionBtn" aria-label="Dupliquer la séance" hidden><svg class="ic"><use href="#i-copy"/></svg></button>
         <button class="btn btn-secondary" id="closeModalBtn">Annuler</button>
         <button class="btn btn-primary grow" id="saveSessionBtn"><svg class="ic"><use href="#i-check"/></svg>Sauvegarder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Course à pied -->
+  <div class="modal-overlay" id="runModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-head">
+        <h3 id="runModalTitle">Nouvelle course</h3>
+        <button class="icon-btn" data-close aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="kind-switch" id="runKindSwitch" role="group" aria-label="Type de séance">
+          <button data-kind="gym" aria-pressed="false"><svg class="ic"><use href="#i-dumbbell"/></svg>Muscu</button>
+          <button class="active" data-kind="run" aria-pressed="true"><svg class="ic"><use href="#i-run"/></svg>Course</button>
+        </div>
+        <p class="strava-badge" id="runStravaBadge" hidden><svg class="ic"><use href="#i-sync"/></svg>Importée depuis Strava</p>
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="runDate">Date</label>
+            <input type="date" id="runDate">
+          </div>
+          <div class="form-row">
+            <label for="runType">Type</label>
+            <select id="runType"></select>
+          </div>
+          <div class="form-row full">
+            <label for="runName">Nom</label>
+            <input type="text" id="runName" placeholder="Footing du matin…" maxlength="200">
+          </div>
+        </div>
+        <div class="section-title">Objectif</div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="runTargetDistance">Distance <span class="unit">(km)</span></label>
+            <input type="text" id="runTargetDistance" inputmode="decimal" autocomplete="off" placeholder="8">
+          </div>
+          <div class="form-row">
+            <label for="runTargetDuration">Durée</label>
+            <input type="text" id="runTargetDuration" inputmode="numeric" autocomplete="off" placeholder="45:00">
+          </div>
+          <div class="form-row full">
+            <label for="runTargetDetails">Détails</label>
+            <input type="text" id="runTargetDetails" maxlength="300" autocomplete="off" placeholder="6 × 400 m, récup 1'30">
+          </div>
+        </div>
+        <div class="section-title">Réalisé <span class="run-pace" id="runPace"></span></div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="runDistance">Distance <span class="unit">(km)</span></label>
+            <input type="text" id="runDistance" inputmode="decimal" autocomplete="off" placeholder="0">
+          </div>
+          <div class="form-row">
+            <label for="runDuration">Durée</label>
+            <input type="text" id="runDuration" inputmode="numeric" autocomplete="off" placeholder="43:20">
+          </div>
+        </div>
+        <div class="form-grid three" style="margin-top:10px;">
+          <div class="form-row">
+            <label for="runElevation">D+ <span class="unit">(m)</span></label>
+            <input type="number" id="runElevation" inputmode="numeric" min="0" placeholder="0">
+          </div>
+          <div class="form-row">
+            <label for="runAvgHr">FC moy.</label>
+            <input type="number" id="runAvgHr" inputmode="numeric" min="0" max="250" placeholder="–">
+          </div>
+          <div class="form-row">
+            <label for="runMaxHr">FC max</label>
+            <input type="number" id="runMaxHr" inputmode="numeric" min="0" max="250" placeholder="–">
+          </div>
+        </div>
+        <div class="section-title">Ressenti</div>
+        <div class="feeling" id="runFeeling" role="group" aria-label="Ressenti"></div>
+        <textarea class="note-input" id="runNotes" rows="2" maxlength="1000" placeholder="Notes : météo, sensations, parcours…" aria-label="Notes sur la course"></textarea>
+        <p class="strava-credit" id="runStravaCredit" hidden>Données fournies par <b>Strava</b></p>
+      </div>
+      <div class="modal-foot">
+        <button class="icon-btn lg danger" id="deleteRunBtn" aria-label="Supprimer" hidden><svg class="ic"><use href="#i-trash"/></svg></button>
+        <button class="icon-btn lg" id="duplicateRunBtn" aria-label="Dupliquer la course" hidden><svg class="ic"><use href="#i-copy"/></svg></button>
+        <button class="btn btn-secondary" id="closeRunBtn">Annuler</button>
+        <button class="btn btn-primary grow" id="saveRunBtn"><svg class="ic"><use href="#i-check"/></svg>Sauvegarder</button>
       </div>
     </div>
   </div>
@@ -1155,6 +1312,13 @@
           <button class="btn btn-secondary btn-sm" id="exportJsonBtn"><svg class="ic ic-sm"><use href="#i-download"/></svg>Sauvegarde JSON</button>
           <button class="btn btn-secondary btn-sm" id="exportCsvBtn"><svg class="ic ic-sm"><use href="#i-download"/></svg>Tableau CSV</button>
         </div>
+        <div class="section-title">Strava</div>
+        <p class="settings-note" id="stravaStatus" style="margin-bottom:8px;">Vérification…</p>
+        <div class="settings-actions">
+          <button class="btn btn-strava btn-sm" id="stravaConnectBtn" hidden>Connecter Strava</button>
+          <button class="btn btn-secondary btn-sm" id="stravaSyncBtn" hidden><svg class="ic ic-sm"><use href="#i-sync"/></svg>Synchroniser</button>
+          <button class="btn btn-secondary btn-sm" id="stravaDisconnectBtn" hidden>Déconnecter</button>
+        </div>
         <div class="section-title">Appareils connectés</div>
         <div id="deviceList" class="settings-group"></div>
         <div class="settings-actions">
@@ -1191,11 +1355,13 @@
   <script src="/js/sound.js"></script>
   <script src="/js/calendar.js"></script>
   <script src="/js/session-form.js"></script>
+  <script src="/js/run-form.js"></script>
   <script src="/js/duplicate.js"></script>
   <script src="/js/workout.js"></script>
   <script src="/js/templates.js"></script>
   <script src="/js/perfs.js"></script>
   <script src="/js/settings.js"></script>
+  <script src="/js/strava.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

@@ -22,6 +22,8 @@ function lastPerformance(name, beforeDate, excludeId) {
 function openWorkout(id) {
   const s = sessions.find(x => x.id === id);
   if (!s) return toast('Séance introuvable', 'error');
+  // Une course se remplit dans son formulaire, pas en mode séance
+  if (isRun(s)) return openEditRun(id);
   workout = JSON.parse(JSON.stringify(s));
   workout.blocks = workout.blocks || [];
   closeModal('sessionModal');

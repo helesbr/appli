@@ -30,6 +30,7 @@ function openDuplicate(id) {
   document.getElementById('dupDate').value = addDaysIso(session.date, 7);
   renderDupDays();
   closeModal('sessionModal');
+  closeModal('runModal');
   openModal('dupModal');
 }
 
