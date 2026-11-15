@@ -99,6 +99,11 @@ function renderRunPerfs() {
   if (r.fastest) records.push(runRecordHTML('gauge', 'Meilleure allure', r.fastest, `${formatPace(paceSeconds(r.fastest.run.distanceKm, r.fastest.run.durationSec))}<small>/km</small>`, r.fastest.name, 'sur 3 km et +'));
   if (r.climb) records.push(runRecordHTML('mountain', 'Plus gros dénivelé', r.climb, `${Math.round(r.climb.run.elevation)}<small>m</small>`));
   document.getElementById('runRecordList').innerHTML = records.join('');
+  // Records sur distance, calculés par Strava à l'intérieur de chaque course
+  const efforts = bestEffortRecords(sessions);
+  document.getElementById('runEffortTitle').hidden = efforts.length === 0;
+  document.getElementById('runEffortList').innerHTML = efforts
+    .map(e => runRecordHTML('trophy', `Meilleur ${e.label}`, e.session, formatDuration(e.sec))).join('');
   document.getElementById('runRecentList').innerHTML = r.recent
     .map(s => runRecordHTML('run', escapeHtml(s.name), s, `${formatKm(s.run.distanceKm)}<small>km</small>`, runSummary(s.run))).join('');
   document.getElementById('runRecentTitle').hidden = r.recent.length === 0;

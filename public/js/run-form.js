@@ -42,7 +42,31 @@ function fillRunForm(session) {
   setRunFeeling(Number(r.feeling) || 0);
   runField('runStravaBadge').hidden = !r.stravaId;
   runField('runStravaCredit').hidden = !r.stravaId;
+  renderRunDetails(r);
   updateRunPace();
+}
+
+// Détails venus de Strava : meilleurs efforts (🏆 = record perso à ce moment-là) et temps par km
+function renderRunDetails(run) {
+  const efforts = (run.bestEfforts || []).filter(e => EFFORT_LABELS[e.key] && num(e.sec) > 0);
+  runField('runEffortsSection').hidden = efforts.length === 0;
+  runField('runEfforts').innerHTML = efforts.map(e => `<span class="effort${e.pr ? ' pr' : ''}">${e.pr ? icon('trophy') : ''}${EFFORT_LABELS[e.key]} <b>${formatDuration(e.sec)}</b></span>`).join('');
+  const rows = splitRows(run);
+  runField('runSplitsSection').hidden = rows.length === 0;
+  const fastest = Math.min(...rows.map(r => r.pace));
+  const slowest = Math.max(...rows.map(r => r.pace));
+  runField('runSplits').innerHTML = rows.map(r => {
+    // Barre : plus elle est longue, plus le km a été rapide
+    const width = slowest > fastest ? 30 + 70 * (slowest - r.pace) / (slowest - fastest) : 100;
+    const label = r.distanceKm < 0.95 ? `${r.km - 1 + Math.round(r.distanceKm * 100) / 100}`.replace('.', ',') : r.km;
+    return `<tr>
+      <td>${label}</td>
+      <td>${formatDuration(r.sec)}</td>
+      <td class="${r.pace === fastest && rows.length > 1 ? 'fast' : ''}">${formatPace(r.pace)}<span class="pace-bar" style="width:${Math.round(width)}%"></span></td>
+      <td>${r.hr ? Math.round(r.hr) : '–'}</td>
+      <td>${r.elev > 0 ? '+' : ''}${Math.round(r.elev)}</td>
+    </tr>`;
+  }).join('');
 }
 
 function openNewRun(date) {
@@ -94,8 +118,12 @@ function collectRunForm() {
     feeling: runFeeling,
     notes: runField('runNotes').value.trim()
   };
-  // Une course importée garde son lien avec Strava : elle ne sera pas réimportée
-  if (previous && previous.run && previous.run.stravaId) run.stravaId = previous.run.stravaId;
+  // Une course importée garde son lien avec Strava (elle ne sera pas réimportée) et ses détails
+  if (previous && previous.run) {
+    ['stravaId', 'splits', 'bestEfforts', 'detailed'].forEach(key => {
+      if (previous.run[key] !== undefined) run[key] = previous.run[key];
+    });
+  }
   return {
     date,
     name: runField('runName').value.trim() || RUN_TYPES[type],

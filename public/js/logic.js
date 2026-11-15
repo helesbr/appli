@@ -203,6 +203,28 @@ function runRecords(sessions, today) {
   };
 }
 
+// Temps par km (Strava) : allure de chaque tronçon, le dernier pouvant être plus court qu'un km
+function splitRows(run) {
+  return ((run && run.splits) || []).filter(sp => num(sp.distance) > 0 && num(sp.sec) > 0).map((sp, i) => ({
+    km: i + 1,
+    distanceKm: num(sp.distance) / 1000,
+    sec: num(sp.sec),
+    pace: num(sp.sec) / (num(sp.distance) / 1000),
+    hr: num(sp.hr),
+    elev: num(sp.elev)
+  }));
+}
+// Meilleurs efforts calculés par Strava (1 km, 5 km…) : le meilleur temps de chaque distance
+const EFFORT_LABELS = { '1k': '1 km', mile: '1 mile', '5k': '5 km', '10k': '10 km', semi: 'Semi-marathon', marathon: 'Marathon' };
+function bestEffortRecords(sessions) {
+  const best = {};
+  (sessions || []).filter(isRun).forEach(s => ((s.run && s.run.bestEfforts) || []).forEach(e => {
+    if (!EFFORT_LABELS[e.key] || !(num(e.sec) > 0)) return;
+    if (!best[e.key] || num(e.sec) < best[e.key].sec) best[e.key] = { key: e.key, label: EFFORT_LABELS[e.key], sec: num(e.sec), session: s };
+  }));
+  return Object.keys(EFFORT_LABELS).filter(k => best[k]).map(k => best[k]);
+}
+
 // Copie prête à refaire : plan et notes conservés, résultats remis à zéro.
 // Ce qui a été réalisé devient l'objectif s'il n'y en avait pas.
 function duplicateSession(session, date) {
@@ -302,6 +324,7 @@ if (typeof module !== 'undefined') {
     getMonday, getWeekNumber, formatDate, frDate, escapeHtml, num, blankZero, sessionStats, sessionStatus,
     normalizeWeight, cleanWeightTyping, stepWeight, exerciseKey, buildExerciseNames, canonicalExerciseName,
     moveExercise, emptyExercise, addExerciseToBlock, lastExerciseNote, addDaysIso, duplicateSession, duplicateTemplate, upsertOutboxItem, removeOutboxItem, dueOutboxItems, applyOutbox,
-    RUN_TYPES, isRun, parseDuration, formatDuration, paceSeconds, formatPace, formatKm, runSummary, runRecords
+    RUN_TYPES, isRun, parseDuration, formatDuration, paceSeconds, formatPace, formatKm, runSummary, runRecords,
+    splitRows, bestEffortRecords
   };
 }
