@@ -1,6 +1,6 @@
 // Service worker MoggTrack : l'appli s'ouvre même hors connexion,
 // avec les dernières données consultées.
-const SHELL_CACHE = 'moggtrack-shell-v7';
+const SHELL_CACHE = 'moggtrack-shell-v8';
 const API_CACHE = 'moggtrack-api';
 const FONT_CACHE = 'moggtrack-fonts';
 const SHELL = [
@@ -51,7 +51,7 @@ self.addEventListener('push', event => {
   try { data = event.data ? event.data.json() : {}; } catch (e) {}
   event.waitUntil(self.registration.showNotification(data.title || 'Repos terminé', {
     body: data.body || 'C\'est reparti !',
-    tag: 'rest-timer',
+    tag: data.tag || 'rest-timer',
     icon: '/icons/icon-192.png',
     vibrate: [200, 100, 200]
   }));

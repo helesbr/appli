@@ -850,6 +850,17 @@
     .run-record .perf-weight { color: var(--run); }
     .run-list-title { margin-top: 20px; }
     .strava-credit { margin-top: 14px; text-align: center; color: var(--subtle); font-size: 0.72rem; }
+    .splits-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+    .splits-table th { color: var(--subtle); font-size: 0.66rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 6px 4px; }
+    .splits-table td { padding: 7px 4px; border-top: 1px solid var(--border); }
+    .splits-table td:nth-child(3) { font-weight: 600; }
+    .splits-table .pace-bar { display: block; height: 4px; margin-top: 4px; border-radius: 2px; background: var(--run); opacity: 0.8; }
+    .splits-table .fast { color: var(--run); }
+    .efforts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .effort { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.82rem; }
+    .effort b { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+    .effort.pr { border-color: var(--run-line); background: var(--run-soft); color: var(--run); }
+    .effort .ic { width: 14px; height: 14px; }
     .strava-credit b { color: var(--strava); }
     .tag-current { color: var(--accent); font-size: 0.72rem; font-weight: 600; margin-left: 4px; white-space: nowrap; }
     .empty-action { margin-top: 14px; }
@@ -1010,6 +1021,8 @@
         <div class="stat card"><div class="stat-label">Année</div><div class="stat-value" id="runYearKm">0</div></div>
       </div>
       <div id="runRecordList"></div>
+      <div class="section-title run-list-title" id="runEffortTitle" hidden>Records sur distance</div>
+      <div id="runEffortList"></div>
       <div class="section-title run-list-title" id="runRecentTitle">Dernières courses</div>
       <div id="runRecentList"></div>
       <div class="empty" id="runEmpty">Tes records de course apparaîtront ici.<br>Saisis une course ou connecte Strava dans les réglages.</div>
@@ -1182,6 +1195,17 @@
             <input type="number" id="runMaxHr" inputmode="numeric" min="0" max="250" placeholder="–">
           </div>
         </div>
+        <div id="runEffortsSection" hidden>
+          <div class="section-title">Meilleurs efforts</div>
+          <div class="efforts" id="runEfforts"></div>
+        </div>
+        <div id="runSplitsSection" hidden>
+          <div class="section-title">Temps par km</div>
+          <table class="splits-table">
+            <thead><tr><th>Km</th><th>Temps</th><th>Allure</th><th>FC</th><th>D±</th></tr></thead>
+            <tbody id="runSplits"></tbody>
+          </table>
+        </div>
         <div class="section-title">Ressenti</div>
         <div class="feeling" id="runFeeling" role="group" aria-label="Ressenti"></div>
         <textarea class="note-input" id="runNotes" rows="2" maxlength="1000" placeholder="Notes : météo, sensations, parcours…" aria-label="Notes sur la course"></textarea>
@@ -1318,6 +1342,14 @@
           <button class="btn btn-strava btn-sm" id="stravaConnectBtn" hidden>Connecter Strava</button>
           <button class="btn btn-secondary btn-sm" id="stravaSyncBtn" hidden><svg class="ic ic-sm"><use href="#i-sync"/></svg>Synchroniser</button>
           <button class="btn btn-secondary btn-sm" id="stravaDisconnectBtn" hidden>Déconnecter</button>
+        </div>
+        <div id="stravaExtras" hidden>
+          <p class="settings-note" id="stravaInstantStatus" style="margin:12px 0 8px;"></p>
+          <p class="settings-note" id="stravaNotifStatus" style="margin-bottom:8px;"></p>
+          <div class="settings-actions">
+            <button class="btn btn-secondary btn-sm" id="stravaInstantBtn" hidden>Activer l'import instantané</button>
+            <button class="btn btn-secondary btn-sm" id="stravaNotifBtn" hidden>Activer la notification</button>
+          </div>
         </div>
         <div class="section-title">Appareils connectés</div>
         <div id="deviceList" class="settings-group"></div>

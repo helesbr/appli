@@ -362,6 +362,16 @@ app.get('/api/health', async (req, res) => {
   res.status(ok ? 200 : 503).json({ ok, checks });
 });
 
+// Strava vérifie l'adresse des alertes en renvoyant le « hub.challenge » (réponse attendue en moins de 2 s)
+const stravaVerifyToken = () => signToken('strava-webhook');
+app.get('/api/strava/webhook', (req, res) => {
+  const token = String(req.query['hub.verify_token'] || '');
+  if (req.query['hub.mode'] !== 'subscribe' || !APP_PASSWORD || !safeEqual(token, stravaVerifyToken())) {
+    return res.status(403).json({ error: 'Vérification refusée' });
+  }
+  res.json({ 'hub.challenge': String(req.query['hub.challenge'] || '') });
+});
+
 // Sur Vercel, une requête peut arriver avant la fin de la connexion
 app.use('/api', async (req, res, next) => {
   if (!APP_PASSWORD) return res.status(503).json(NO_PASSWORD);
@@ -457,10 +467,37 @@ app.get('/api/strava/callback', async (req, res) => {
         lastSyncAt: null
       }
     }, { upsert: true });
+    // Import instantané : sans lui, les courses arrivent quand même à l'ouverture de l'appli
+    try {
+      await ensureStravaWebhook(publicOrigin(req));
+    } catch (e) {
+      reportError('strava', e);
+    }
     stravaResultPage(res, true, 'Tes courses vont arriver dans l\'appli.');
   } catch (e) {
     reportError('strava', e);
     stravaResultPage(res, false, 'Strava n\'a pas validé la connexion. Réessaie dans un instant.');
+  }
+});
+
+// Alerte envoyée par Strava (nouvelle activité, modification, accès retiré). Sans mot de passe :
+// on vérifie le compte et l'abonnement, puis on relit l'activité chez Strava avec notre propre jeton.
+app.post('/api/strava/webhook', async (req, res) => {
+  const event = req.body || {};
+  try {
+    const link = stravaConfigured() && await integrationsCol.findOne({ id: 'strava' });
+    const ours = link && String(event.owner_id) === String(link.athleteId)
+      && (!link.webhookId || String(event.subscription_id) === String(link.webhookId));
+    if (!ours) return res.json({ ok: true });
+    if (event.object_type === 'athlete' && event.updates && String(event.updates.authorized) === 'false') {
+      await integrationsCol.deleteOne({ id: 'strava' });
+    } else if (event.object_type === 'activity' && ['create', 'update'].includes(event.aspect_type)) {
+      await importStravaWebhookActivity(link, event.object_id, event.aspect_type);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    reportError('strava', e);
+    res.status(500).json({ error: 'Import impossible pour le moment' }); // Strava renverra l'alerte
   }
 });
 
@@ -525,6 +562,8 @@ function cleanSessionBlocks(blocks) {
 
 // --- COURSE À PIED ---
 const RUN_TYPES = ['footing', 'fractionne', 'longue', 'tempo', 'course', 'autre'];
+// Meilleurs efforts gardés (calculés par Strava à l'intérieur de chaque course)
+const RUN_EFFORTS = ['1k', 'mile', '5k', '10k', 'semi', 'marathon'];
 // Nombre positif borné, 0 sinon ; « 8,5 » est accepté comme 8.5
 function cleanPositive(v, max, decimals = 0) {
   const n = parseFloat(String(v ?? '').replace(',', '.'));
@@ -554,6 +593,20 @@ function cleanRun(r) {
     notes: cleanText(run.notes, 1000)
   };
   if (/^\d{1,20}$/.test(String(run.stravaId ?? ''))) clean.stravaId = String(run.stravaId);
+  // Détails venus de Strava : temps par km et meilleurs efforts
+  if (Array.isArray(run.splits)) {
+    clean.splits = run.splits.slice(0, 200).map(sp => ({
+      distance: cleanPositive(sp && sp.distance, 5000),
+      sec: cleanPositive(sp && sp.sec, 36000),
+      elev: Math.round(Math.max(-2000, Math.min(2000, Number(sp && sp.elev) || 0))),
+      hr: cleanPositive(sp && sp.hr, 250)
+    }));
+  }
+  if (Array.isArray(run.bestEfforts)) {
+    clean.bestEfforts = run.bestEfforts.filter(e => e && RUN_EFFORTS.includes(e.key)).slice(0, RUN_EFFORTS.length)
+      .map(e => ({ key: e.key, sec: cleanPositive(e.sec, 360000), pr: !!e.pr }));
+  }
+  if (run.detailed === true) clean.detailed = true;
   return clean;
 }
 const cleanKind = kind => (kind === 'run' ? 'run' : 'gym');
@@ -586,6 +639,14 @@ app.get('/api/devices', route(async (req, res) => {
   res.json(devices
     .map(d => ({ id: d.id, name: d.name, lastSeen: d.lastSeen, current: d.id === req.device.id }))
     .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen)));
+}));
+
+// Abonnement de cet appareil aux notifications (ex. : course importée depuis Strava)
+app.put('/api/devices/current/push', route(async (req, res) => {
+  const subscription = cleanSubscription(req.body && req.body.subscription);
+  if (!subscription) return res.status(400).json({ error: 'Abonnement aux notifications invalide' });
+  await devicesCol.updateOne({ id: req.device.id }, { $set: { pushSubscription: subscription } });
+  res.json({ message: 'Notifications activées sur cet appareil' });
 }));
 
 app.post('/api/devices/logout-all', route(async (req, res) => {
@@ -937,8 +998,11 @@ function stravaRunType(activity, planned) {
   const byWorkout = { 1: 'course', 2: 'longue', 3: 'fractionne' }[activity.workout_type];
   return byWorkout || (planned && planned.run && planned.run.type) || 'footing';
 }
-function stravaRunFields(a) {
-  return {
+const STRAVA_EFFORT_KEYS = { '1K': '1k', '1 mile': 'mile', '5K': '5k', '10K': '10k', 'Half-Marathon': 'semi', 'Marathon': 'marathon' };
+const STRAVA_DETAILS_PER_SYNC = 30; // reste loin des limites de l'API Strava (100 requêtes / 15 min)
+// detailed : l'activité complète a été lue (temps par km et meilleurs efforts, s'il y en a)
+function stravaRunFields(a, detailed) {
+  const fields = {
     distanceKm: (Number(a.distance) || 0) / 1000,
     durationSec: Number(a.moving_time) || Number(a.elapsed_time) || 0,
     elevation: Number(a.total_elevation_gain) || 0,
@@ -946,6 +1010,139 @@ function stravaRunFields(a) {
     maxHr: Number(a.max_heartrate) || 0,
     stravaId: String(a.id)
   };
+  if (detailed) {
+    fields.detailed = true;
+    fields.splits = (Array.isArray(a.splits_metric) ? a.splits_metric : []).map(sp => ({
+      distance: sp.distance, sec: sp.moving_time || sp.elapsed_time, elev: sp.elevation_difference, hr: sp.average_heartrate
+    }));
+    fields.bestEfforts = (Array.isArray(a.best_efforts) ? a.best_efforts : [])
+      .filter(e => STRAVA_EFFORT_KEYS[e.name])
+      .map(e => ({ key: STRAVA_EFFORT_KEYS[e.name], sec: e.elapsed_time, pr: e.pr_rank === 1 }));
+  }
+  return fields;
+}
+// Activité complète, ou null si elle n'existe plus
+async function stravaActivity(token, id) {
+  try {
+    return await stravaFetch(`/api/v3/activities/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+  } catch (e) {
+    if (e.status === 404) return null;
+    throw e;
+  }
+}
+// Ajoute une course : complète la course prévue ce jour-là, sinon crée une séance. null si déjà importée.
+async function importStravaRun(a, detailed, known) {
+  const date = String(a.start_date_local || '').slice(0, 10);
+  if (!DATE_RE.test(date)) return null;
+  const planned = known.find(s => s.date === date && !s.completed && !(s.run && s.run.stravaId));
+  try {
+    if (planned) {
+      // Objectif, ressenti et notes déjà saisis sont gardés
+      const run = cleanRun({ ...planned.run, ...stravaRunFields(a, detailed), type: stravaRunType(a, planned) });
+      await sessionsCol.updateOne({ id: planned.id }, { $set: { run, completed: true } });
+      Object.assign(planned, { run, completed: true });
+      return { status: 'completed', session: planned };
+    }
+    const session = {
+      id: crypto.randomUUID(),
+      date,
+      name: cleanText(a.name, 200) || 'Course',
+      kind: 'run',
+      run: cleanRun({ ...stravaRunFields(a, detailed), type: stravaRunType(a) }),
+      blocks: [],
+      completed: true
+    };
+    await sessionsCol.insertOne({ ...session });
+    known.push(session);
+    return { status: 'created', session };
+  } catch (e) {
+    if (e.code === 11000) return null; // déjà importée par une synchronisation simultanée
+    throw e;
+  }
+}
+
+// --- NOTIFICATION « COURSE IMPORTÉE » ---
+function formatClock(sec) {
+  const t = Math.round(sec), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s2 = String(t % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${s2}` : `${m}:${s2}`;
+}
+function runNotificationBody(session) {
+  const r = session.run || {};
+  const parts = [];
+  if (r.distanceKm) parts.push(`${String(r.distanceKm).replace('.', ',')} km`);
+  if (r.durationSec) parts.push(`en ${formatClock(r.durationSec)}`);
+  if (r.distanceKm && r.durationSec) parts.push(`· ${formatClock(r.durationSec / r.distanceKm)} /km`);
+  const records = (r.bestEfforts || []).filter(e => e.pr).length;
+  return `${session.name} : ${parts.join(' ')}${records ? ` · ${records} record${records > 1 ? 's' : ''} perso 🏆` : ''}`;
+}
+// Envoyée à chaque appareil abonné ; un abonnement expiré est oublié
+async function notifyDevices(payload) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+  const devices = (await devicesCol.find({}, NO_ID).toArray()).filter(d => d.pushSubscription);
+  await Promise.all(devices.map(async device => {
+    try {
+      await webpush.sendNotification(device.pushSubscription, JSON.stringify(payload), {
+        vapidDetails: { subject: VAPID_SUBJECT, publicKey: VAPID_PUBLIC_KEY, privateKey: VAPID_PRIVATE_KEY },
+        TTL: 6 * 3600
+      });
+    } catch (e) {
+      if (e.statusCode === 404 || e.statusCode === 410) {
+        await devicesCol.updateOne({ id: device.id }, { $set: { pushSubscription: null } });
+      } else {
+        reportError('push', e);
+      }
+    }
+  }));
+}
+
+// Alerte Strava : lit l'activité, l'importe si c'est une course, puis prévient le téléphone
+async function importStravaWebhookActivity(link, activityId, aspect) {
+  if (!/^\d{1,20}$/.test(String(activityId))) return;
+  const token = await stravaAccessToken(link);
+  if (!token) return;
+  const a = await stravaActivity(token, activityId);
+  if (!a || !STRAVA_RUN_SPORTS.includes(a.sport_type || a.type)) return;
+  if (a.athlete && String(a.athlete.id) !== String(link.athleteId)) return; // activité d'un autre compte
+  const known = await sessionsCol.find({ kind: 'run' }, NO_ID).toArray();
+  const existing = known.find(s => s.run && s.run.stravaId === String(a.id));
+  if (existing) {
+    // Activité modifiée sur Strava (ex. : distance corrigée) : les chiffres sont mis à jour
+    if (aspect === 'update') {
+      await sessionsCol.updateOne({ id: existing.id }, { $set: { run: cleanRun({ ...existing.run, ...stravaRunFields(a, true) }) } });
+    }
+    return;
+  }
+  const result = await importStravaRun(a, true, known);
+  if (result) {
+    await notifyDevices({ title: 'Course importée 🏃', body: runNotificationBody(result.session), tag: 'strava-run' });
+  }
+}
+
+// Abonne l'appli aux alertes Strava (un seul abonnement par application Strava)
+async function ensureStravaWebhook(origin) {
+  const callbackUrl = `${origin}/api/strava/webhook`;
+  const auth = new URLSearchParams({ client_id: STRAVA_CLIENT_ID, client_secret: STRAVA_CLIENT_SECRET });
+  const existing = await stravaFetch(`/api/v3/push_subscriptions?${auth}`);
+  for (const sub of Array.isArray(existing) ? existing : []) {
+    if (sub.callback_url === callbackUrl) {
+      await integrationsCol.updateOne({ id: 'strava' }, { $set: { webhookId: sub.id } });
+      return sub.id;
+    }
+    await stravaFetch(`/api/v3/push_subscriptions/${sub.id}?${auth}`, { method: 'DELETE' });
+  }
+  const created = await stravaFetch('/api/v3/push_subscriptions', {
+    method: 'POST',
+    body: new URLSearchParams({ client_id: STRAVA_CLIENT_ID, client_secret: STRAVA_CLIENT_SECRET, callback_url: callbackUrl, verify_token: stravaVerifyToken() })
+  });
+  await integrationsCol.updateOne({ id: 'strava' }, { $set: { webhookId: created.id } });
+  return created.id;
+}
+async function removeStravaWebhook() {
+  const auth = new URLSearchParams({ client_id: STRAVA_CLIENT_ID, client_secret: STRAVA_CLIENT_SECRET });
+  const existing = await stravaFetch(`/api/v3/push_subscriptions?${auth}`);
+  for (const sub of Array.isArray(existing) ? existing : []) {
+    await stravaFetch(`/api/v3/push_subscriptions/${sub.id}?${auth}`, { method: 'DELETE' });
+  }
 }
 
 // Importe les courses Strava : une course prévue le même jour est complétée, sinon une séance est créée
@@ -972,39 +1169,36 @@ async function syncStrava(link) {
 
   const known = await sessionsCol.find({ kind: 'run' }, NO_ID).toArray();
   const imported = new Set(known.map(s => s.run && s.run.stravaId).filter(Boolean));
-  let created = 0, completed = 0;
-  for (const a of runs) {
-    if (imported.has(String(a.id))) continue;
-    imported.add(String(a.id));
-    const date = String(a.start_date_local).slice(0, 10);
-    if (!DATE_RE.test(date)) continue;
-    const planned = known.find(s => s.date === date && !s.completed && !(s.run && s.run.stravaId));
-    try {
-      if (planned) {
-        planned.completed = true;
-        // Objectif, ressenti et notes déjà saisis sont gardés
-        const run = cleanRun({ ...planned.run, ...stravaRunFields(a), type: stravaRunType(a, planned) });
-        await sessionsCol.updateOne({ id: planned.id }, { $set: { run, completed: true } });
-        completed++;
-      } else {
-        await sessionsCol.insertOne({
-          id: crypto.randomUUID(),
-          date,
-          name: cleanText(a.name, 200) || 'Course',
-          kind: 'run',
-          run: cleanRun({ ...stravaRunFields(a), type: stravaRunType(a) }),
-          blocks: [],
-          completed: true
-        });
-        created++;
-      }
-    } catch (e) {
-      if (e.code !== 11000) throw e; // déjà importée par une synchronisation simultanée
+  let created = 0, completed = 0, enriched = 0;
+  let detailsLeft = STRAVA_DETAILS_PER_SYNC;
+  const asked = new Set(); // une même synchronisation ne relit jamais une activité
+  for (const summary of runs) {
+    if (imported.has(String(summary.id))) continue;
+    imported.add(String(summary.id));
+    // L'activité complète apporte les temps par km et les meilleurs efforts
+    let a = summary, detailed = false;
+    if (detailsLeft > 0) {
+      detailsLeft--;
+      asked.add(String(summary.id));
+      const full = await stravaActivity(token, summary.id);
+      if (full) { a = { ...summary, ...full }; detailed = true; }
     }
+    const result = await importStravaRun(a, detailed, known);
+    if (result && result.status === 'created') created++;
+    if (result && result.status === 'completed') completed++;
+  }
+  // Courses importées sans leurs détails (avant cette fonction, ou au-delà de la limite) : complétées petit à petit
+  for (const s of known.filter(k => k.run && k.run.stravaId && !k.run.detailed && !asked.has(k.run.stravaId))) {
+    if (detailsLeft-- <= 0) break;
+    const full = await stravaActivity(token, s.run.stravaId);
+    const run = cleanRun({ ...s.run, ...(full ? stravaRunFields(full, true) : {}), detailed: true });
+    await sessionsCol.updateOne({ id: s.id }, { $set: { run } });
+    s.run = run;
+    enriched++;
   }
   // Notée seulement si tout s'est bien passé : un échec ne fait rien perdre
   await integrationsCol.updateOne({ id: 'strava' }, { $set: { lastSyncAt: startedAt } });
-  return { connected: true, created, completed };
+  return { connected: true, created, completed, enriched };
 }
 
 app.get('/api/strava', route(async (req, res) => {
@@ -1013,8 +1207,22 @@ app.get('/api/strava', route(async (req, res) => {
     configured: stravaConfigured(),
     connected: !!link,
     athleteName: link ? link.athleteName : '',
-    lastSyncAt: link ? link.lastSyncAt : null
+    lastSyncAt: link ? link.lastSyncAt : null,
+    instant: !!(link && link.webhookId)
   });
+}));
+
+// Réactive l'import instantané (si l'abonnement aux alertes Strava a échoué à la connexion)
+app.post('/api/strava/webhook/setup', route(async (req, res) => {
+  if (!stravaConfigured()) return res.status(503).json(NO_STRAVA);
+  if (!await integrationsCol.findOne({ id: 'strava' })) return res.status(409).json({ error: 'Connecte d\'abord Strava' });
+  try {
+    await ensureStravaWebhook(publicOrigin(req));
+    res.json({ instant: true });
+  } catch (e) {
+    reportError('strava', e);
+    res.status(502).json({ error: 'Strava a refusé l\'abonnement aux alertes, réessaie plus tard' });
+  }
 }));
 
 app.get('/api/strava/connect-url', (req, res) => {
@@ -1056,6 +1264,7 @@ app.delete('/api/strava', route(async (req, res) => {
     try {
       const token = await stravaAccessToken(link);
       if (token) await stravaFetch('/oauth/deauthorize', { method: 'POST', body: new URLSearchParams({ access_token: token }) });
+      await removeStravaWebhook();
     } catch (e) {
       console.warn('Strava : retrait de l\'accès impossible', e.message);
     }

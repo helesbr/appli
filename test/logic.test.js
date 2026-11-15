@@ -230,3 +230,19 @@ test('dupliquer une course : le réalisé devient l\'objectif, les résultats re
     run: { type: 'footing', target: { distanceKm: 8.2, durationSec: 2580, details: 'Facile' } }
   });
 });
+
+test('temps par km : allure de chaque tronçon, dernier tronçon partiel compris', () => {
+  const rows = logic.splitRows({ splits: [{ distance: 1000, sec: 312, hr: 145, elev: 4 }, { distance: 0, sec: 0 }, { distance: 500, sec: 150, hr: 160, elev: -2 }] });
+  assert.deepStrictEqual(rows.map(r => [r.km, r.distanceKm, logic.formatPace(r.pace), r.hr, r.elev]), [[1, 1, '5:12', 145, 4], [2, 0.5, '5:00', 160, -2]]);
+  assert.deepStrictEqual(logic.splitRows({}), []);
+});
+
+test('records sur distance : meilleur temps par distance, dans l\'ordre 1 km → marathon', () => {
+  const run = (id, efforts) => ({ id, date: '2026-11-0' + id, name: 'C' + id, kind: 'run', run: { bestEfforts: efforts } });
+  const records = logic.bestEffortRecords([
+    run(1, [{ key: '5k', sec: 1540 }, { key: '1k', sec: 291 }]),
+    run(2, [{ key: '5k', sec: 1490 }, { key: 'inconnu', sec: 10 }, { key: '10k', sec: 0 }]),
+    { id: 'muscu', blocks: [] }
+  ]);
+  assert.deepStrictEqual(records.map(r => [r.key, r.label, r.sec, r.session.id]), [['1k', '1 km', 291, 1], ['5k', '5 km', 1490, 2]]);
+});
