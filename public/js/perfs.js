@@ -17,9 +17,6 @@ function renderPerfs() {
   noResult.hidden = perfs.length === 0 || filtered.length > 0;
   noResult.textContent = `Aucun exercice ne correspond à « ${document.getElementById('perfSearch').value.trim()} ».`;
   filtered.forEach(p => {
-    const w = num(p.weight), r = num(p.reps);
-    // Epley estimate of the one-rep max
-    const oneRm = r > 1 && w > 0 ? Math.round(w * (1 + r/30)) : null;
     const div = document.createElement('div');
     div.className = 'perf-card card';
     div.setAttribute('role', 'button');
@@ -32,7 +29,7 @@ function renderPerfs() {
       </div>
       <div class="perf-value">
         <div class="perf-weight">${escapeHtml(p.weight)}<small>kg</small></div>
-        <div class="perf-reps">× ${escapeHtml(p.reps)}${oneRm ? ` <span class="perf-1rm">· 1RM ≈ ${oneRm}</span>` : ''}</div>
+        <div class="perf-reps">× ${escapeHtml(p.reps)}</div>
       </div>`;
     div.onclick = () => showExercisePodium(p);
     list.appendChild(div);
@@ -59,13 +56,11 @@ function showExercisePodium(perf) {
   container.innerHTML = podium.map((p, rank) => {
     const session = sessions.find(s => s.id === p.sessionId);
     const blocks = session ? exerciseInSession(session, perf.exercise, p) : [];
-    const w = num(p.weight), r = num(p.reps);
-    const oneRm = r > 1 && w > 0 ? ` · 1RM ≈ ${Math.round(w * (1 + r / 30))}` : '';
     return `<div class="podium-entry">
       <div class="podium-head">
         <span class="podium-rank" aria-label="${rank + 1}e">${PODIUM_MEDALS[rank]}</span>
         <div class="podium-info">
-          <b>${escapeHtml(p.weight)} kg × ${escapeHtml(p.reps)}</b><span class="perf-1rm">${oneRm}</span>
+          <b>${escapeHtml(p.weight)} kg × ${escapeHtml(p.reps)}</b>
           <span class="podium-when">${frDate(p.date)} · ${escapeHtml(p.sessionName)}</span>
         </div>
         <button class="btn btn-secondary btn-sm" data-session="${escapeHtml(p.sessionId)}">Séance</button>
