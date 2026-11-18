@@ -46,6 +46,11 @@ class FakeCollection {
     for (const [key, by] of Object.entries(update.$inc || {})) doc[key] = (doc[key] || 0) + by;
     return project(doc, options);
   }
+  async findOneAndDelete(filter, options) {
+    const index = this.docs.findIndex(d => matches(d, filter));
+    if (index < 0) return null;
+    return project(this.docs.splice(index, 1)[0], options);
+  }
   async deleteOne(filter) {
     const index = this.docs.findIndex(d => matches(d, filter));
     if (index < 0) return { deletedCount: 0 };

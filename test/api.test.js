@@ -11,8 +11,10 @@ const realWebPush = require('web-push');
 const vapid = realWebPush.generateVAPIDKeys();
 const pushes = [];
 let pushError = null;
+let pushDelayMs = 0;
 const fakeWebPush = {
   sendNotification: async (subscription, payload) => {
+    if (pushDelayMs) await new Promise(r => setTimeout(r, pushDelayMs));
     if (pushError) throw pushError;
     pushes.push({ subscription, payload: JSON.parse(payload) });
   }
@@ -257,6 +259,28 @@ test('les records regroupent un exercice écrit de plusieurs façons', async () 
   assert.strictEqual(found[0].weight, 70);
 });
 
+test('records : podium des 3 meilleures séances, une seule série par séance', async () => {
+  const token = await login();
+  const make = (date, sets) => ({ date, name: 'Push ' + date, blocks: [{ type: 'single', exercises: [{ name: 'Dips lestés', sets }] }] });
+  const ids = {};
+  for (const [date, sets] of [
+    ['2026-06-01', [{ reps: '8', weight: '20' }, { reps: '6', weight: '25' }]],   // meilleure série : 25 × 6
+    ['2026-06-08', [{ reps: '5', weight: '30' }, { reps: '5', weight: '30' }]],   // 30 × 5 (deux fois la même)
+    ['2026-06-15', [{ reps: '8', weight: '25' }]],                              // 25 × 8 : bat 25 × 6
+    ['2026-06-22', [{ reps: '6', weight: '25' }]],                              // égalité avec le 1er juin, plus récente
+    ['2026-06-29', [{ reps: '', weight: '' }]]                                  // pas encore faite
+  ]) {
+    ids[date] = crypto.randomUUID();
+    await call('PUT', `/api/sessions/${ids[date]}`, { token, body: make(date, sets) });
+  }
+  const perf = (await (await call('GET', '/api/top-perfs', { token })).json()).find(p => p.exercise === 'Dips lestés');
+  assert.strictEqual(perf.weight, 30);
+  assert.strictEqual(perf.sessionId, ids['2026-06-08']);
+  assert.deepStrictEqual(perf.podium.map(p => [p.date, p.weight, p.reps]), [
+    ['2026-06-08', 30, 5], ['2026-06-15', 25, 8], ['2026-06-01', 25, 6]
+  ]);
+});
+
 test('export JSON complet et CSV lisible, sans formule exécutable', async () => {
   const token = await login();
   await call('PUT', `/api/sessions/${crypto.randomUUID()}`, { token, body: { date: '2026-05-01', name: '=HACK()', blocks: [{ type: 'single', exercises: [{ name: 'Tirage; poulie', rest: 60, sets: [{ reps: '10', weight: '50.5', target: '10', done: true }] }] }] } });
@@ -316,6 +340,17 @@ test('notification : programmée via QStash, envoyée une fois, annulable et rem
   assert.strictEqual(published.at(-1).delay, '105s');
   assert.strictEqual((await (await call('POST', `/api/rest-timer/${first}/fire`)).json()).sent, false);
   assert.strictEqual((await (await call('POST', `/api/rest-timer/${second}/fire`)).json()).sent, true);
+});
+
+test('notification : deux rappels simultanés de QStash n\'envoient qu\'une notification', async () => {
+  const token = await login();
+  const id = (await (await call('POST', '/api/rest-timer', { token, body: { seconds: 60, label: 'Squat', subscription } })).json()).id;
+  const before = pushes.length;
+  pushDelayMs = 50; // l'envoi réel prend du temps : le second rappel arrive pendant le premier
+  const results = await Promise.all([1, 2].map(async () => (await call('POST', `/api/rest-timer/${id}/fire`)).json()));
+  pushDelayMs = 0;
+  assert.strictEqual(pushes.length, before + 1);
+  assert.deepStrictEqual(results.map(r => r.sent).sort(), [false, true]);
 });
 
 test('notification : abonnement expiré sans relance, erreur temporaire relancée', async () => {

@@ -246,3 +246,19 @@ test('records sur distance : meilleur temps par distance, dans l\'ordre 1 km →
   ]);
   assert.deepStrictEqual(records.map(r => [r.key, r.label, r.sec, r.session.id]), [['1k', '1 km', 291, 1], ['5k', '5 km', 1490, 2]]);
 });
+
+test('fiche d\'un record : l\'exercice est retrouvé malgré l\'orthographe, avec la série de la perf', () => {
+  const session = { blocks: [
+    { type: 'single', exercises: [{ name: 'Bench', sets: [{ reps: '5', weight: '90' }] }] },
+    { type: 'superset', exercises: [
+      { name: '  développé COUCHÉ ', sets: [{ reps: '8', weight: '80' }, { reps: '6', weight: '85' }] },
+      { name: 'Dips', sets: [] }
+    ] }
+  ] };
+  const found = logic.exerciseInSession(session, 'Développé couché', { weight: 85, reps: 6 });
+  assert.strictEqual(found.length, 1);
+  assert.strictEqual(found[0].superset, true);
+  assert.strictEqual(found[0].bestIndex, 1);
+  assert.deepStrictEqual(logic.exerciseInSession(session, 'Squat'), []);
+  assert.strictEqual(logic.exerciseInSession(session, 'bench')[0].bestIndex, -1);
+});

@@ -34,11 +34,51 @@ function renderPerfs() {
         <div class="perf-weight">${escapeHtml(p.weight)}<small>kg</small></div>
         <div class="perf-reps">× ${escapeHtml(p.reps)}${oneRm ? ` <span class="perf-1rm">· 1RM ≈ ${oneRm}</span>` : ''}</div>
       </div>`;
-    div.onclick = () => showSessionDetail(p.sessionId);
+    div.onclick = () => showExercisePodium(p);
     list.appendChild(div);
   });
 }
 document.getElementById('perfSearch').addEventListener('input', renderPerfs);
+
+// Bloc d'un exercice (repos, note, séries) ; bestIndex : série mise en évidence
+function exerciseDetailHTML(ex, bestIndex = -1) {
+  return `<h4><span>${escapeHtml(ex.name)}</span>${ex.rest?`<span class="rest-pill">${icon('timer')}${escapeHtml(ex.rest)}s</span>`:''}</h4>
+    ${ex.note?`<p class="detail-note">${escapeHtml(ex.note)}</p>`:''}
+    <table><thead><tr><th>Série</th><th>Reps</th><th>Poids</th></tr></thead>
+    <tbody>${(ex.sets||[]).map((set,i)=>`<tr${i===bestIndex?' class="best-set"':''}><td>${i+1}</td><td>${escapeHtml(set.reps)}</td><td>${escapeHtml(set.weight)} kg</td></tr>`).join('')}</tbody></table>`;
+}
+
+// Fiche d'un exercice : ses 3 meilleures séances, avec seulement le bloc de cet exercice
+const PODIUM_MEDALS = ['🥇', '🥈', '🥉'];
+function showExercisePodium(perf) {
+  const podium = perf.podium && perf.podium.length ? perf.podium : [perf];
+  document.getElementById('detailTitle').textContent = perf.exercise;
+  document.getElementById('detailDate').textContent = podium.length > 1 ? `Tes ${podium.length} meilleures séances` : 'Ta meilleure séance';
+  document.getElementById('detailStats').innerHTML = '';
+  const container = document.getElementById('detailExercises');
+  container.innerHTML = podium.map((p, rank) => {
+    const session = sessions.find(s => s.id === p.sessionId);
+    const blocks = session ? exerciseInSession(session, perf.exercise, p) : [];
+    const w = num(p.weight), r = num(p.reps);
+    const oneRm = r > 1 && w > 0 ? ` · 1RM ≈ ${Math.round(w * (1 + r / 30))}` : '';
+    return `<div class="podium-entry">
+      <div class="podium-head">
+        <span class="podium-rank" aria-label="${rank + 1}e">${PODIUM_MEDALS[rank]}</span>
+        <div class="podium-info">
+          <b>${escapeHtml(p.weight)} kg × ${escapeHtml(p.reps)}</b><span class="perf-1rm">${oneRm}</span>
+          <span class="podium-when">${frDate(p.date)} · ${escapeHtml(p.sessionName)}</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" data-session="${escapeHtml(p.sessionId)}">Séance</button>
+      </div>
+      ${blocks.map(b => `<div class="session-detail-exo${b.superset ? ' in-superset' : ''}">${b.superset ? `<span class="block-tag">${icon('zap')}Superset</span>` : ''}${exerciseDetailHTML(b.exercise, b.bestIndex)}</div>`).join('')}
+    </div>`;
+  }).join('');
+  container.onclick = e => {
+    const btn = e.target.closest('[data-session]');
+    if (btn) showSessionDetail(btn.dataset.session);
+  };
+  openModal('detailModal');
+}
 
 async function showSessionDetail(id) {
   // Déjà en mémoire la plupart du temps : fonctionne aussi hors connexion
@@ -52,6 +92,7 @@ async function showSessionDetail(id) {
     <div class="stat"><div class="stat-label">Volume</div><div class="stat-value">${formatVolume(st.volume)}</div></div>`;
   const container = document.getElementById('detailExercises');
   container.innerHTML = '';
+  container.onclick = null;
   (s.blocks||[]).forEach(block => {
     const bDiv = document.createElement('div');
     if (block.type==='superset') {
@@ -61,10 +102,7 @@ async function showSessionDetail(id) {
     (block.exercises||[]).forEach(ex => {
       const div = document.createElement('div');
       div.className = 'session-detail-exo';
-      div.innerHTML = `<h4><span>${escapeHtml(ex.name)}</span>${ex.rest?`<span class="rest-pill">${icon('timer')}${escapeHtml(ex.rest)}s</span>`:''}</h4>
-        ${ex.note?`<p class="detail-note">${escapeHtml(ex.note)}</p>`:''}
-        <table><thead><tr><th>Série</th><th>Reps</th><th>Poids</th></tr></thead>
-        <tbody>${(ex.sets||[]).map((set,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(set.reps)}</td><td>${escapeHtml(set.weight)} kg</td></tr>`).join('')}</tbody></table>`;
+      div.innerHTML = exerciseDetailHTML(ex);
       bDiv.appendChild(div);
     });
     container.appendChild(bDiv);

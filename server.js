@@ -254,10 +254,13 @@ const pushConfigured = () => !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && QSTASH_
 // Appelé par QStash, donc sans mot de passe : l'identifiant aléatoire du minuteur sert de preuve
 app.post('/api/rest-timer/:id/fire', async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Minuteur introuvable' });
+  let timer = null;
   try {
     await ensureMongo();
-    const timer = await restTimersCol.findOne({ id: req.params.id });
-    if (!timer) return res.json({ sent: false }); // annulé ou remplacé entre-temps
+    // Le minuteur est retiré AVANT l'envoi, en une seule opération : si QStash rappelle
+    // deux fois (il peut le faire), le second rappel ne trouve plus rien et n'envoie pas de doublon
+    timer = await restTimersCol.findOneAndDelete({ id: req.params.id });
+    if (!timer) return res.json({ sent: false }); // annulé, remplacé ou déjà envoyé
     const payload = JSON.stringify({
       title: 'Repos terminé',
       body: (timer.label ? timer.label + ' : ' : '') + 'c\'est reparti !'
@@ -267,14 +270,12 @@ app.post('/api/rest-timer/:id/fire', async (req, res) => {
       TTL: 120,
       urgency: 'high'
     });
-    await restTimersCol.deleteOne({ id: timer.id });
     res.json({ sent: true });
   } catch (e) {
     // Abonnement expiré : inutile de réessayer, l'appli se réabonne au prochain repos
-    if (e.statusCode === 404 || e.statusCode === 410) {
-      await restTimersCol.deleteOne({ id: req.params.id }).catch(() => {});
-      return res.json({ sent: false, expired: true });
-    }
+    if (e.statusCode === 404 || e.statusCode === 410) return res.json({ sent: false, expired: true });
+    // Erreur temporaire : le minuteur est remis en place pour que la nouvelle tentative de QStash l'envoie
+    if (timer) await restTimersCol.insertOne(timer).catch(() => {});
     reportError('push', e);
     res.status(502).json({ error: 'Envoi de la notification impossible' }); // QStash retentera
   }
@@ -902,7 +903,9 @@ app.get('/api/top-perfs', route(async (req, res) => {
   const sessions = await sessionsCol
     .find({}, { projection: { _id: 0, id: 1, name: 1, date: 1, blocks: 1 } })
     .toArray();
-  const perfs = {};
+  // Meilleure série de chaque séance, par exercice : le podium compare des séances différentes
+  const better = (a, b) => a.weight > b.weight || (a.weight === b.weight && a.reps > b.reps);
+  const bySession = {}; // exercice → séance → meilleure série
   sessions.forEach(session => {
     flattenExercises(session).forEach(ex => {
       const key = exerciseKey(ex.name);
@@ -910,21 +913,21 @@ app.get('/api/top-perfs', route(async (req, res) => {
         const weight = Number(set.weight) || 0;
         const reps = Number(set.reps) || 0;
         if (!key || (!weight && !reps)) return; // série pas encore faite
-        if (!perfs[key] || weight > perfs[key].weight ||
-           (weight === perfs[key].weight && reps > perfs[key].reps)) {
-          perfs[key] = {
-            exercise: ex.name.trim(),
-            weight,
-            reps,
-            sessionId: session.id,
-            sessionName: session.name,
-            date: session.date
-          };
-        }
+        const perExercise = bySession[key] || (bySession[key] = {});
+        const current = perExercise[session.id];
+        const candidate = { exercise: ex.name.trim(), weight, reps, sessionId: session.id, sessionName: session.name, date: session.date };
+        if (!current || better(candidate, current)) perExercise[session.id] = candidate;
       });
     });
   });
-  res.json(Object.values(perfs).sort((a, b) => a.exercise.localeCompare(b.exercise, 'fr')));
+  const perfs = Object.values(bySession).map(perExercise => {
+    // À égalité, la perf la plus ancienne passe devant : c'est elle qui a établi le record
+    const podium = Object.values(perExercise)
+      .sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : String(a.date).localeCompare(String(b.date))))
+      .slice(0, 3);
+    return { ...podium[0], podium };
+  });
+  res.json(perfs.sort((a, b) => a.exercise.localeCompare(b.exercise, 'fr')));
 }));
 
 // --- EXPORT ---
