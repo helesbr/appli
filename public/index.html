@@ -431,6 +431,15 @@
     .note-input:focus { border-color: var(--accent); }
     .note-input::placeholder { color: var(--subtle); }
     .wk-last-note .ic { color: var(--accent); }
+    .podium-entry { margin-bottom: 18px; }
+    .podium-entry:last-child { margin-bottom: 0; }
+    .podium-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .podium-rank { font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+    .podium-info { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
+    .podium-info b { font-family: var(--font-display); font-size: 1.15rem; color: var(--accent); }
+    .podium-when { flex-basis: 100%; color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .session-detail-exo.in-superset .block-tag { margin-bottom: 6px; }
+    .session-detail-exo tr.best-set td { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
     .detail-note { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
     .dup-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 14px; }
     .dup-days button { min-height: 52px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--muted); }

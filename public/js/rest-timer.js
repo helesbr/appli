@@ -136,7 +136,11 @@ async function closeRestNotification() {
   const shown = await reg.getNotifications({ tag: REST_NOTIF_TAG }).catch(() => []);
   shown.forEach(n => n.close());
 }
-// Filet de sécurité (ordinateur, Android) : même tag que le serveur, donc pas de doublon
+// Filet de sécurité, seulement si le serveur n'a pas programmé la notification : l'iPhone
+// ne remplace pas toujours une notification de même tag, il afficherait les deux
+function showFallbackNotification(ended) {
+  Promise.resolve(ended.pushReq).then(id => { if (!id) showRestNotification(ended.label); }).catch(() => {});
+}
 async function showRestNotification(label) {
   if (!restNotifAllowed()) return;
   const options = {
@@ -203,7 +207,7 @@ function tickRest() {
     document.getElementById('rtLabel').textContent = 'Repos terminé · c\'est reparti !';
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     playRestSound();
-    if (document.hidden) showRestNotification(rest.label);
+    if (document.hidden) showFallbackNotification(rest);
     const ended = rest;
     setTimeout(() => {
       if (rest === ended) stopRest();

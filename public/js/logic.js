@@ -115,6 +115,19 @@ function moveExercise(blocks, bi, ei, dir) {
   return { bi: neighbor, ei };
 }
 
+// Cet exercice dans une séance (il peut y apparaître plusieurs fois), avec l'index de la série
+// qui a fait la perf (même charge et mêmes reps), pour la mettre en évidence
+function exerciseInSession(session, name, perf) {
+  const key = exerciseKey(name);
+  const found = [];
+  ((session && session.blocks) || []).forEach(b => (b.exercises || []).forEach(ex => {
+    if (exerciseKey(ex.name) !== key) return;
+    const best = perf ? (ex.sets || []).findIndex(set => num(set.weight) === num(perf.weight) && num(set.reps) === num(perf.reps)) : -1;
+    found.push({ exercise: ex, superset: b.type === 'superset', bestIndex: best });
+  }));
+  return found;
+}
+
 // Dernière note écrite sur cet exercice, avant cette séance : le rappel affiché à la salle
 function lastExerciseNote(sessions, name, beforeDate, excludeId) {
   const key = exerciseKey(name);
@@ -325,6 +338,6 @@ if (typeof module !== 'undefined') {
     normalizeWeight, cleanWeightTyping, stepWeight, exerciseKey, buildExerciseNames, canonicalExerciseName,
     moveExercise, emptyExercise, addExerciseToBlock, lastExerciseNote, addDaysIso, duplicateSession, duplicateTemplate, upsertOutboxItem, removeOutboxItem, dueOutboxItems, applyOutbox,
     RUN_TYPES, isRun, parseDuration, formatDuration, paceSeconds, formatPace, formatKm, runSummary, runRecords,
-    splitRows, bestEffortRecords
+    splitRows, bestEffortRecords, exerciseInSession
   };
 }
