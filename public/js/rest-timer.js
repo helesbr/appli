@@ -1,31 +1,9 @@
-// Minuteur de repos, son, écran allumé et notification de fin de repos
+// Minuteur de repos, écran allumé et notification de fin de repos (le son est dans sound.js)
 // --- MINUTEUR DE REPOS ---
 let rest = null;      // { endAt, total, label, timer, finished }
-let audioCtx = null;
 let wakeLock = null;
 const restEl = document.getElementById('restTimer');
 
-// L'audio doit être activé pendant un geste de l'utilisateur (iOS)
-function unlockAudio() {
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    prepareCustomSound();
-  } catch (e) {}
-}
-function beep() {
-  if (!audioCtx) return;
-  [0, 0.22, 0.44].forEach((t, i) => {
-    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-    osc.frequency.value = i === 2 ? 1320 : 880;
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    const start = audioCtx.currentTime + t;
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.3, start + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
-    osc.start(start); osc.stop(start + 0.2);
-  });
-}
 function fmtClock(sec) {
   sec = Math.max(0, Math.ceil(sec));
   return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
@@ -195,18 +173,40 @@ function startRest(seconds, label) {
   armRestNotification();
   tickRest();
 }
+// Appli à l'écran à la fin du repos : seul le son de l'appli prévient, sans le « ding » de la
+// notification en plus. La notification du serveur est annulée juste avant la fin, et reprogrammée
+// si l'appli passe en arrière-plan d'ici là (écran verrouillé, autre appli).
+const NOTIF_HANDOFF_S = 3;
+const REST_SOUND_LATE_S = 2; // au-delà, la fin est passée pendant que l'appli était en pause
+function handOffToSound() {
+  if (!rest || rest.finished || rest.soundOnly || document.hidden || !rest.pushReq || !soundManager.enabled()) return;
+  rest.soundOnly = true;
+  cancelRestNotification();
+  rest.pushReq = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !rest || rest.finished || !rest.soundOnly) return;
+  rest.soundOnly = false;
+  armRestNotification();
+});
+
 // Calculé à partir de l'heure de fin : reste juste même si le téléphone met l'appli en pause
 function tickRest() {
   if (!rest) return;
   const left = (rest.endAt - Date.now()) / 1000;
+  if (left > 0 && left <= NOTIF_HANDOFF_S) handOffToSound();
   document.getElementById('rtTime').textContent = fmtClock(left);
   document.getElementById('rtBar').style.width = Math.max(0, Math.min(100, left / rest.total * 100)) + '%';
   if (left <= 0 && !rest.finished) {
     rest.finished = true;
     restEl.classList.add('finished');
     document.getElementById('rtLabel').textContent = 'Repos terminé · c\'est reparti !';
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    playRestSound();
+    // Le son ne joue que si la fin arrive pendant que l'appli est à l'écran. En arrière-plan,
+    // ou au retour dans l'appli après la fin, c'est la notification qui a prévenu : pas de son en retard.
+    if (!document.hidden && left > -REST_SOUND_LATE_S) {
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      playRestSound();
+    }
     if (document.hidden) showFallbackNotification(rest);
     const ended = rest;
     setTimeout(() => {
@@ -231,6 +231,7 @@ function adjustRest(delta) {
   }
   rest.endAt += delta * 1000;
   rest.total = Math.max(rest.total, (rest.endAt - Date.now()) / 1000);
+  rest.soundOnly = false; // nouvelle fin : la notification reprogrammée pourra être annulée à son tour
   armRestNotification();
   tickRest();
 }

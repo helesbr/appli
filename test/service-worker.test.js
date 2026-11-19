@@ -88,3 +88,19 @@ test('chaque script de la page est mis en cache pour le mode hors connexion', ()
     assert.ok(fs.existsSync(path.join(publicDir, script)), `${script} n'existe pas`);
   }
 });
+
+test('le son déposé dans public/sounds est gardé hors connexion, et son absence ne bloque pas l\'installation', async () => {
+  const listeners = {};
+  const self = { addEventListener: (type, fn) => { listeners[type] = fn; }, location: { origin: 'https://moggtrack.test' }, skipWaiting() {} };
+  const added = [];
+  const cache = {
+    addAll: async urls => { added.push(...urls); },
+    add: async url => { if (url.endsWith('.wav')) throw new Error('404'); added.push(url); }
+  };
+  vm.runInNewContext(source, { self, URL, Promise, console, caches: { open: async () => cache }, Request: class {}, fetch: async () => ({}) });
+  let waited;
+  listeners.install({ waitUntil: p => { waited = p; } });
+  await waited; // aucun rejet malgré le .wav absent
+  assert.ok(added.includes('/sounds/notif.mp3'));
+  assert.ok(added.includes('/js/sound.js'));
+});
