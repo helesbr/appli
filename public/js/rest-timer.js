@@ -1,31 +1,9 @@
-// Minuteur de repos, son, écran allumé et notification de fin de repos
+// Minuteur de repos, écran allumé et notification de fin de repos (le son est dans sound.js)
 // --- MINUTEUR DE REPOS ---
 let rest = null;      // { endAt, total, label, timer, finished }
-let audioCtx = null;
 let wakeLock = null;
 const restEl = document.getElementById('restTimer');
 
-// L'audio doit être activé pendant un geste de l'utilisateur (iOS)
-function unlockAudio() {
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    prepareCustomSound();
-  } catch (e) {}
-}
-function beep() {
-  if (!audioCtx) return;
-  [0, 0.22, 0.44].forEach((t, i) => {
-    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-    osc.frequency.value = i === 2 ? 1320 : 880;
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    const start = audioCtx.currentTime + t;
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.3, start + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
-    osc.start(start); osc.stop(start + 0.2);
-  });
-}
 function fmtClock(sec) {
   sec = Math.max(0, Math.ceil(sec));
   return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');

@@ -870,6 +870,14 @@
     .effort.pr { border-color: var(--run-line); background: var(--run-soft); color: var(--run); }
     .effort .ic { width: 14px; height: 14px; }
     .strava-credit b { color: var(--strava); }
+    /* Interrupteur (réglages) */
+    .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
+    .switch-row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .switch { appearance: none; -webkit-appearance: none; flex-shrink: 0; width: 48px; height: 28px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--border-strong); position: relative; cursor: pointer; transition: background .2s; }
+    .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform .2s var(--ease), background .2s; }
+    .switch:checked { background: var(--accent); border-color: var(--accent); }
+    .switch:checked::after { transform: translateX(20px); background: var(--accent-ink); }
+    .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .tag-current { color: var(--accent); font-size: 0.72rem; font-weight: 600; margin-left: 4px; white-space: nowrap; }
     .empty-action { margin-top: 14px; }
 
@@ -1366,13 +1374,16 @@
           <button class="btn btn-danger btn-sm" id="logoutAllBtn">Tout déconnecter</button>
         </div>
         <div class="section-title">Fin de repos</div>
-        <p class="settings-note" id="soundStatus" style="margin-bottom:8px;">Son : bip par défaut</p>
+        <label class="switch-row">
+          <span><span class="settings-row-title">Son à la fin du repos</span><span class="settings-note" id="soundStatus">Son : bip</span></span>
+          <input type="checkbox" class="switch" id="soundEnabled" checked>
+        </label>
         <div class="settings-actions">
           <label class="btn btn-secondary btn-sm file-btn">Choisir un son<input type="file" id="soundFile" accept="audio/*,.mp3,.m4a,.wav,.aac" class="sr-only"></label>
           <button class="btn btn-secondary btn-sm" id="soundTestBtn">Écouter</button>
         </div>
         <button class="btn btn-ghost btn-sm btn-block" id="soundRemoveBtn" style="margin-top:8px;" hidden>Revenir au bip</button>
-        <p class="settings-note" style="margin:12px 0 8px;">Le son joue quand l'appli est ouverte. Écran verrouillé, c'est la notification qui prend le relais, avec le son de notification de l'iPhone.</p>
+        <p class="settings-note" style="margin:12px 0 8px;">Le son joue quand l'appli est ouverte, en baissant ta musique un instant sans la couper. Écran verrouillé, c'est la notification qui prend le relais, avec le son de notification de l'iPhone.</p>
         <button class="btn btn-secondary btn-sm btn-block" id="notifTestBtn">Tester la notification (dans 10 s)</button>
         <div class="section-title">État du serveur</div>
         <p class="settings-note" id="healthStatus"></p>

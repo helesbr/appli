@@ -1,6 +1,6 @@
 // Service worker MoggTrack : l'appli s'ouvre même hors connexion,
 // avec les dernières données consultées.
-const SHELL_CACHE = 'moggtrack-shell-v8';
+const SHELL_CACHE = 'moggtrack-shell-v9';
 const API_CACHE = 'moggtrack-api';
 const FONT_CACHE = 'moggtrack-fonts';
 const SHELL = [
@@ -28,8 +28,14 @@ const SHELL = [
   '/icons/apple-touch-icon.png'
 ];
 
+// Son de fin de repos déposé dans public/sounds/ : gardé hors connexion s'il existe (facultatif)
+const OPTIONAL = ['/sounds/notif.mp3', '/sounds/notif.wav'];
+
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL)));
+  event.waitUntil(caches.open(SHELL_CACHE).then(cache => Promise.all([
+    cache.addAll(SHELL),
+    ...OPTIONAL.map(url => cache.add(url).catch(() => {}))
+  ])));
   self.skipWaiting();
 });
 
