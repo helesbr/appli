@@ -173,10 +173,27 @@ function startRest(seconds, label) {
   armRestNotification();
   tickRest();
 }
+// Appli à l'écran à la fin du repos : seul le son de l'appli prévient, sans le « ding » de la
+// notification en plus. La notification du serveur est annulée juste avant la fin, et reprogrammée
+// si l'appli passe en arrière-plan d'ici là (écran verrouillé, autre appli).
+const NOTIF_HANDOFF_S = 3;
+function handOffToSound() {
+  if (!rest || rest.finished || rest.soundOnly || document.hidden || !rest.pushReq || !soundManager.enabled()) return;
+  rest.soundOnly = true;
+  cancelRestNotification();
+  rest.pushReq = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !rest || rest.finished || !rest.soundOnly) return;
+  rest.soundOnly = false;
+  armRestNotification();
+});
+
 // Calculé à partir de l'heure de fin : reste juste même si le téléphone met l'appli en pause
 function tickRest() {
   if (!rest) return;
   const left = (rest.endAt - Date.now()) / 1000;
+  if (left <= NOTIF_HANDOFF_S) handOffToSound();
   document.getElementById('rtTime').textContent = fmtClock(left);
   document.getElementById('rtBar').style.width = Math.max(0, Math.min(100, left / rest.total * 100)) + '%';
   if (left <= 0 && !rest.finished) {
@@ -209,6 +226,7 @@ function adjustRest(delta) {
   }
   rest.endAt += delta * 1000;
   rest.total = Math.max(rest.total, (rest.endAt - Date.now()) / 1000);
+  rest.soundOnly = false; // nouvelle fin : la notification reprogrammée pourra être annulée à son tour
   armRestNotification();
   tickRest();
 }
