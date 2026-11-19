@@ -177,6 +177,7 @@ function startRest(seconds, label) {
 // notification en plus. La notification du serveur est annulée juste avant la fin, et reprogrammée
 // si l'appli passe en arrière-plan d'ici là (écran verrouillé, autre appli).
 const NOTIF_HANDOFF_S = 3;
+const REST_SOUND_LATE_S = 2; // au-delà, la fin est passée pendant que l'appli était en pause
 function handOffToSound() {
   if (!rest || rest.finished || rest.soundOnly || document.hidden || !rest.pushReq || !soundManager.enabled()) return;
   rest.soundOnly = true;
@@ -193,15 +194,19 @@ document.addEventListener('visibilitychange', () => {
 function tickRest() {
   if (!rest) return;
   const left = (rest.endAt - Date.now()) / 1000;
-  if (left <= NOTIF_HANDOFF_S) handOffToSound();
+  if (left > 0 && left <= NOTIF_HANDOFF_S) handOffToSound();
   document.getElementById('rtTime').textContent = fmtClock(left);
   document.getElementById('rtBar').style.width = Math.max(0, Math.min(100, left / rest.total * 100)) + '%';
   if (left <= 0 && !rest.finished) {
     rest.finished = true;
     restEl.classList.add('finished');
     document.getElementById('rtLabel').textContent = 'Repos terminé · c\'est reparti !';
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    playRestSound();
+    // Le son ne joue que si la fin arrive pendant que l'appli est à l'écran. En arrière-plan,
+    // ou au retour dans l'appli après la fin, c'est la notification qui a prévenu : pas de son en retard.
+    if (!document.hidden && left > -REST_SOUND_LATE_S) {
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      playRestSound();
+    }
     if (document.hidden) showFallbackNotification(rest);
     const ended = rest;
     setTimeout(() => {
